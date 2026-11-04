@@ -1,0 +1,1383 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>未来の家計簿</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+/* Layout: 帳簿の罫線をヒントにした1カラム。上に7つのステップ、下に常時表示の「いまのプラン」バー。
+   結果画面は「給与明細の1か月」を中心に、年齢ごとの収支グラフと貯蓄の推移を並べる。 */
+:root{
+  --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --accent:#184f95; --accent-ink:#ffffff; --accent-wash:#e8f0fb;
+  --good:#006300; --bad:#c22f2f; --warn:#8a5a00;
+  --good-fill:#0ca30c; --bad-fill:#d03b3b; --warn-fill:#fab219;
+  --bad-wash:#fbeaea; --good-wash:#e7f5e7; --warn-wash:#fdf3dc;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948; --tax:#c3c2b7;
+  --font-display:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+  --font-body:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --plane:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+    --accent:#6da7ec; --accent-ink:#0b0b0b; --accent-wash:#16253a;
+    --good:#4fc24f; --bad:#ef7b7b; --warn:#fab219;
+    --bad-wash:#3a1b1b; --good-wash:#16301a; --warn-wash:#33290f;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --tax:#4a4a46;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --plane:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --accent:#6da7ec; --accent-ink:#0b0b0b; --accent-wash:#16253a;
+  --good:#4fc24f; --bad:#ef7b7b; --warn:#fab219;
+  --bad-wash:#3a1b1b; --good-wash:#16301a; --warn-wash:#33290f;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --tax:#4a4a46;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--plane);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.7;
+  padding-block:0 130px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:860px;margin:0 auto}
+h1,h2,h3{font-family:var(--font-display);line-height:1.35;margin:0;text-wrap:balance}
+p{margin:0}
+.mast{padding:28px 0 18px;border-bottom:2px solid var(--ink);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px);background-size:100% 30px;background-position:0 -1px}
+.mast h1{font-weight:900;font-size:clamp(30px,6vw,44px);letter-spacing:.02em;background:var(--plane);display:inline-block;padding-right:12px}
+.mast p{color:var(--ink2);font-size:14px;background:var(--plane);display:inline-block;padding-right:12px;margin-top:4px}
+.steps{display:flex;gap:0;list-style:none;margin:14px 0 0;padding:0;overflow-x:auto;border-bottom:1px solid var(--grid)}
+.steps button{font:inherit;font-size:14px;background:none;border:0;border-bottom:3px solid transparent;color:var(--ink2);padding:10px 12px 8px;cursor:pointer;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-start;line-height:1.3}
+.steps small{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.steps button[aria-current="step"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+.steps button:hover{background:var(--accent-wash)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.opt:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
+.panel{padding:28px 0 8px}
+.panel[hidden]{display:none}
+.panel>h2{font-size:clamp(22px,4.4vw,28px);font-weight:900}
+.lead{color:var(--ink2);margin:6px 0 20px;max-width:46em}
+.minutes{font-size:12px;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:1px 9px;margin-left:8px;vertical-align:middle;font-family:var(--font-body);font-weight:400;white-space:nowrap}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:18px;margin:0 0 16px}
+.card h3{font-size:17px;font-weight:700;margin-bottom:10px}
+.card h3 small{font-weight:400;font-size:13px;color:var(--ink2);margin-left:6px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px}
+.opt{display:block;position:relative;cursor:pointer;min-width:0}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt .b{display:block;height:100%;border:1.5px solid var(--axis);border-radius:8px;padding:10px 12px;background:var(--surface);transition:background .12s,border-color .12s}
+.opt:hover .b{background:var(--accent-wash)}
+.opt input:checked + .b{border-color:var(--accent);background:var(--accent-wash);box-shadow:inset 0 0 0 1px var(--accent)}
+.opt .t{display:block;font-weight:700;line-height:1.4}
+.opt .d{display:block;font-size:13px;color:var(--ink2);line-height:1.55;margin-top:2px}
+.rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin:12px 0 4px}
+.rc{font:inherit;color:inherit;text-align:left;background:var(--surface);border:1.5px solid var(--axis);border-radius:8px;padding:8px;min-width:0;display:block}
+button.rc{cursor:pointer}
+button.rc:hover{background:var(--accent-wash)}
+.rc[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-wash);box-shadow:inset 0 0 0 1px var(--accent)}
+.rc .t{display:block;font-weight:700;font-size:13.5px;margin-top:4px}
+.rc .d{display:block;font-size:13px;color:var(--ink2)}
+.fp{display:block;width:100%;height:auto}
+.fp rect{fill:var(--surface);stroke:var(--axis);stroke-width:1.5}
+.fp text{fill:var(--ink2);font-size:10px;text-anchor:middle;font-family:var(--font-body)}
+a.btn{display:inline-flex;align-items:center;text-decoration:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:12px;border-radius:99px;padding:1px 9px;border:1px solid var(--axis);color:var(--ink2);white-space:nowrap}
+.chip.l3{border-color:var(--good);color:var(--good)} .chip.l2{border-color:var(--accent);color:var(--accent)}
+.chip.l1{border-color:var(--warn);color:var(--warn)} .chip.l0{border-color:var(--bad);color:var(--bad)}
+.field{display:flex;flex-direction:column;gap:4px;margin:0 0 14px}
+.field>label,.field>.lab{font-weight:700;font-size:15px}
+.field .hint{font-size:13px;color:var(--ink2)}
+.row{display:flex;flex-wrap:wrap;gap:14px}
+.row>*{flex:1 1 220px;min-width:0}
+input[type=range]{width:100%;accent-color:var(--accent);margin:6px 0}
+.val{font-family:var(--font-display);font-weight:900;font-size:26px;line-height:1.2}
+.val small{font-size:14px;font-weight:700;margin-left:2px}
+select,textarea,input[type=number]{font:inherit;color:var(--ink);background:var(--surface);border:1.5px solid var(--axis);border-radius:8px;padding:8px 10px;width:100%;max-width:100%}
+textarea{min-height:92px;resize:vertical}
+.check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;cursor:pointer}
+.check input{width:20px;height:20px;margin-top:3px;accent-color:var(--accent);flex:none}
+.nav{display:flex;justify-content:space-between;gap:12px;margin:22px 0 8px}
+.btn{font:inherit;font-weight:700;border-radius:8px;border:1.5px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:10px 22px;cursor:pointer;min-height:44px}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:hover{filter:brightness(1.08)}
+.note{font-size:13px;color:var(--ink2);line-height:1.65}
+.callout{border-left:4px solid var(--accent);background:var(--accent-wash);padding:10px 14px;border-radius:0 8px 8px 0;font-size:14px;line-height:1.7}
+.callout.bad{border-color:var(--bad);background:var(--bad-wash)} .callout.warn{border-color:var(--warn-fill);background:var(--warn-wash)} .callout.good{border-color:var(--good);background:var(--good-wash)}
+.mini{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.mini th,.mini td{padding:6px 8px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap}
+.mini th:first-child,.mini td:first-child{text-align:left;white-space:normal}
+.mini thead th{font-weight:700;color:var(--ink2);font-size:13px;border-bottom:1.5px solid var(--axis)}
+.scroll{overflow-x:auto;max-width:100%}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--ring);border-radius:10px;padding:14px}
+.tile .k{font-size:13px;color:var(--ink2)}
+.tile .v{font-family:var(--font-display);font-weight:900;font-size:30px;line-height:1.25}
+.tile .s{font-size:12.5px;color:var(--ink2)}
+.verdict{border-radius:10px;padding:16px 18px;margin-bottom:16px;border:1.5px solid}
+.verdict.ok{background:var(--good-wash);border-color:var(--good)} .verdict.tight{background:var(--warn-wash);border-color:var(--warn-fill)} .verdict.ng{background:var(--bad-wash);border-color:var(--bad)}
+.verdict h3{font-size:22px;font-weight:900;margin-bottom:4px}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.ages{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.ages button{font:inherit;font-size:14px;min-width:52px;min-height:40px;border:1.5px solid var(--axis);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;font-variant-numeric:tabular-nums}
+.ages button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.seg{display:flex;gap:2px;height:30px;position:relative;margin:6px 0 4px}
+.seg i{display:flex;align-items:center;padding:0 6px;border-radius:4px;font-style:normal;font-size:12px;font-weight:700;color:#fff;overflow:visible;white-space:nowrap;min-width:0}
+.seg i.dk{color:#0b0b0b}
+.seg i.tx{color:var(--ink)}
+.seg i.over{background:repeating-linear-gradient(135deg,var(--bad-fill) 0 5px,transparent 5px 9px)!important;border:1px solid var(--bad-fill);color:var(--bad)}
+.limit{position:absolute;top:-6px;bottom:-6px;width:0;border-left:2px dashed var(--ink)}
+.limitlab{font-size:12px;color:var(--ink2);margin-bottom:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--ink2);margin:6px 0 10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.legend i.ln{height:0;width:16px;border-top:2px solid var(--ink);border-radius:0}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.chart text{fill:var(--ink2);font-family:var(--font-body)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--axis);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.6;box-shadow:0 4px 14px rgba(0,0,0,.15);min-width:150px;max-width:230px;z-index:5}
+.tip[hidden]{display:none}
+.tip b{font-variant-numeric:tabular-nums}
+.tip .h{font-family:var(--font-display);font-weight:900;font-size:15px}
+.tip .r{display:flex;justify-content:space-between;gap:10px}
+.tip .r span:first-child{display:inline-flex;align-items:center;gap:6px;color:var(--ink2)}
+.tip i{display:inline-block;width:10px;height:0;border-top:3px solid}
+.events{list-style:none;margin:8px 0 0;padding:0;font-size:14px;display:grid;gap:4px}
+.events li{display:flex;gap:10px}
+.events b{min-width:48px;font-variant-numeric:tabular-nums}
+details{margin:0 0 12px}
+summary{cursor:pointer;font-weight:700;padding:8px 0}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--ink);color:var(--plane);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.bar .in{max-width:860px;margin:0 auto;display:flex;flex-wrap:wrap;gap:2px 18px;align-items:baseline;font-size:13.5px}
+.bar b{font-family:var(--font-display);font-weight:900;font-size:19px;font-variant-numeric:tabular-nums}
+.bar .tag{font-size:12px;opacity:.75}
+.bar .bad{color:#ff9a9a}.bar .good{color:#8fe08f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .bar{background:#2c2c2a;color:#f0efec}}
+:root[data-theme="dark"] .bar{background:#2c2c2a;color:#f0efec}
+.saved td:first-child{white-space:normal;min-width:150px}
+@media (max-width:520px){.panel{padding-top:20px}.card{padding:14px}.btn{padding:10px 16px}.tile .v{font-size:26px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.hbar{display:grid;grid-template-columns:7.5em 1fr 5.5em;gap:8px;align-items:center;margin:6px 0;font-size:14px}
+.hbar .ht{height:14px;background:var(--grid);border-radius:4px;overflow:hidden}
+.hbar .hf{height:100%;border-radius:0 4px 4px 0}
+.hbar .hv{text-align:right;font-variant-numeric:tabular-nums}
+.meter{display:block;height:8px;border-radius:4px;background:var(--grid);margin:6px 0;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--s1);border-radius:0 4px 4px 0}
+@media (max-width:520px){.hbar{grid-template-columns:5.5em 1fr 4.8em;font-size:13px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="mast">
+  <h1>未来の家計簿</h1><br>
+  <p>25歳・35歳・45歳の自分は、収入でどんな暮らしができる?(高校2年生向け・約40分・勤務先は新宿の会社と仮定)</p>
+</header>
+<nav aria-label="ステップ"><ol class="steps" id="steps"></ol></nav>
+
+<main>
+<!-- 0 -->
+<section class="panel" id="p0" data-title="理想" data-min="2">
+  <h2>まず直感で答えよう<span class="minutes">2分</span></h2>
+  <p class="lead">調べる前の「いまの予想」が、この授業の出発点です。あとで計算結果と比べます。正解はないので、思ったとおりに動かしてください。</p>
+  <div class="card">
+    <h3>25歳・35歳の自分は、いくらもらっていると思う?</h3>
+    <div class="field">
+      <label for="net25">25歳の毎月の手取り(税金や保険料を引いて、実際に使えるお金)</label>
+      <div class="val"><span id="net25v"></span><small>万円 / 月</small></div>
+      <input type="range" id="net25" min="10" max="50" step="1">
+    </div>
+    <div class="field">
+      <label for="gross35">35歳の年収(会社が1年間に払う総額。ボーナス込み・額面)</label>
+      <div class="val"><span id="gross35v"></span><small>万円 / 年</small></div>
+      <input type="range" id="gross35" min="200" max="1500" step="10">
+    </div>
+  </div>
+  <div class="card">
+    <h3>お金の希望</h3>
+    <div class="field"><label for="wantFree">毎月、自由に使えるお金（家賃・食事・ローンなどを払ったあとの「のこり」）は、いくら欲しい?</label>
+      <div class="val"><span id="wantFreev"></span><small>万円 / 月</small></div><input type="range" id="wantFree" min="1" max="30" step="1"></div>
+    <div class="field"><label for="wantSave">65歳のときの貯金は、いくら欲しい?(退職金・年金はふくまない)</label>
+      <div class="val"><span id="wantSavev"></span><small>万円</small></div><input type="range" id="wantSave" min="0" max="5000" step="100"></div>
+  </div>
+  <div class="card">
+    <h3>35歳までに手に入れていたいものは?<small>あとの画面の初期設定になります</small></h3>
+    <label class="check"><input type="checkbox" id="wCar"><span>自分の車<span class="note"><br>コンパクトカーを想定します</span></span></label>
+    <label class="check"><input type="checkbox" id="wHouse"><span>自分の家<span class="note"><br>35歳で購入するとして始めます</span></span></label>
+    <label class="check"><input type="checkbox" id="wMarry"><span>結婚<span class="note"><br>30歳で結婚するとして始めます</span></span></label>
+    <label class="check"><input type="checkbox" id="wKids"><span>子ども2人<span class="note"><br>31歳から2年おきに生まれるとして始めます</span></span></label>
+    <div class="field" style="margin-top:10px">
+      <label for="wPlace">住みたい場所(勤務先は新宿にある会社と仮定)</label>
+      <select id="wPlace"></select>
+    </div>
+  </div>
+  <div class="nav"><span></span><button class="btn" data-go="1">いまの自分を知る</button></div>
+</section>
+
+<!-- 1 いまの自分 -->
+<section class="panel" id="p1" data-title="いまの自分" data-min="5" hidden>
+  <h2>いまの自分を、数字で知ろう<span class="minutes">5分</span></h2>
+  <p class="lead">会社に入る人は、入る前に、勉強や努力を積み重ねています。まず自分の「いま」を、正直に答えてください。ここで入れた数字は、次の画面の計算に使います。</p>
+  <div class="card">
+    <h3>学力と成績</h3>
+    <div class="field"><label for="dev">最近の模試・テストでの、自分の偏差値(わからなければ先生に聞く。目安でよい)</label>
+      <div class="val"><span id="devv"></span><small>偏差値</small></div><input type="range" id="dev" min="30" max="60" step="1"></div>
+    <div class="field"><label for="hyotei">評定平均(通知表の5段階の平均)</label>
+      <div class="val"><span id="hyoteiv"></span><small>/ 5.0</small></div><input type="range" id="hyotei" min="1" max="5" step="0.1"></div>
+    <div class="field"><label for="eiken">英語の資格(英検)</label><select id="eiken"></select></div>
+    <div class="field"><label for="homework">宿題・提出物</label><select id="homework"></select></div>
+    <div class="field"><label for="testAvg">定期テストの平均点(5教科くらいの平均。100点満点)</label>
+      <div class="val"><span id="testAvgv"></span><small>点</small></div><input type="range" id="testAvg" min="0" max="100" step="5"></div>
+    <div class="field"><label for="vocab">知っている英単語の数(だいたいでよい。中学の範囲が約1,200語、高校卒業までに約3,000語以上と言われます)</label>
+      <div class="val"><span id="vocabv"></span><small>語</small></div><input type="range" id="vocab" min="0" max="5000" step="100"></div>
+  </div>
+  <div class="card">
+    <h3>1日の時間の使い方</h3>
+    <div class="field"><label for="wkStudy">平日の家での勉強(宿題もふくむ)</label>
+      <div class="val"><span id="wkStudyv"></span><small>分 / 日</small></div><input type="range" id="wkStudy" min="0" max="240" step="10"></div>
+    <div class="field"><label for="holStudy">休日の勉強</label>
+      <div class="val"><span id="holStudyv"></span><small>分 / 日</small></div><input type="range" id="holStudy" min="0" max="480" step="15"></div>
+    <div class="field"><label for="phone">スマホ・ゲーム・動画・SNSの時間(1日)</label>
+      <div class="val"><span id="phonev"></span><small>時間 / 日</small></div><input type="range" id="phone" min="0" max="10" step="0.5"></div>
+  </div>
+  <div class="card">
+    <h3>いまのバイトで、生活できる?</h3>
+    <div class="field"><label for="wage">時給(まだ働いていなければ、働くとしたらいくら?)</label>
+      <div class="val"><span id="wagev"></span><small>円 / 時間</small></div><input type="range" id="wage" min="1000" max="2000" step="50"></div>
+    <div class="field"><label for="hrs">1週間に働く時間</label>
+      <div class="val"><span id="hrsv"></span><small>時間 / 週</small></div><input type="range" id="hrs" min="0" max="40" step="1"></div>
+    <div id="baitInfo" class="callout"></div>
+  </div>
+  <div class="card">
+    <h3>この数字で、入れる大学は?<small>推定。予備校によって偏差値の数字は少し違います</small></h3>
+    <div id="devInfo"></div>
+  </div>
+  <div class="card">
+    <h3>あなたの勉強量を計算すると</h3>
+    <div class="tiles" id="nowTiles"></div>
+    <p class="note" id="nowNote" style="margin-top:10px"></p>
+  </div>
+  <div class="nav"><button class="btn ghost" data-go="0">戻る</button><button class="btn" data-go="2">憧れの会社を調べる</button></div>
+</section>
+
+<!-- 2 憧れの会社 -->
+<section class="panel" id="p2" data-title="憧れの会社" data-min="5" hidden>
+  <h2>憧れの会社に、入れるのか?<span class="minutes">5分</span></h2>
+  <p class="lead">「大手に入りたい」と思うことは、悪いことではありません。大切なのは、その会社に入った人たちが、どれだけの準備をしているかを知ることです。</p>
+
+  <div class="card">
+    <h3>1. 入りたい会社・仕事をひとつ選ぶ</h3>
+    <div class="grid2" id="dreamOpts" role="radiogroup" aria-label="入りたい会社"></div>
+    <div id="dreamInfo" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h3>2. 勉強量のギャップ</h3>
+    <p class="note">目標の大学に届くのに必要な勉強時間(推定)と、いまのペースを比べます。「会社に合わせる」を選ぶと、1.で選んだ会社に入る人が多い大学のレベルになります。</p>
+    <div class="field" style="margin-top:8px"><label for="goalUniv">目標にする大学のレベル</label><select id="goalUniv"></select></div>
+    <div class="field"><label for="addMin">今日から、毎日あと何分、勉強を増やす?</label>
+      <div class="val"><span id="addMinv"></span><small>分 / 日 増やす</small></div><input type="range" id="addMin" min="0" max="300" step="10"></div>
+    <div id="gapBox"></div>
+    <div class="scroll"><table class="mini" id="gapTbl"></table></div>
+    <div id="gapAct" style="margin-top:10px"></div>
+  </div>
+  <div class="nav"><button class="btn ghost" data-go="1">戻る</button><button class="btn" data-go="3">進路を選ぶ</button></div>
+</section>
+
+<section class="panel" id="p3" data-title="進路" data-min="3" hidden>
+  <h2>卒業後、どの道に進む?<span class="minutes">3分</span></h2>
+  <p class="lead">進路と、就職先の規模で、収入のカーブは大きく変わります。就職先は「入りたい会社」ではなく「自分の進路から現実に届く会社」で考えましょう。</p>
+  <div class="card"><h3>進路</h3><div class="grid2" id="pathOpts" role="radiogroup" aria-label="進路"></div></div>
+  <div class="card">
+    <h3>就職先の規模<small>この進路から届きやすさ(目安)</small></h3>
+    <div class="grid2" id="rankOpts" role="radiogroup" aria-label="就職先の規模"></div>
+    <p class="note" id="rankNote" style="margin-top:10px"></p>
+  </div>
+  <div class="card">
+    <h3>この選択での収入<small>本人のみ・ボーナス込み</small></h3>
+    <p class="note" id="pathNote" style="margin-bottom:10px"></p>
+    <div class="scroll"><table class="mini" id="incomeTbl"></table></div>
+    <p class="note" style="margin-top:8px">手取りは、額面から税金と社会保険料を引いた金額(額面の約8割〜7割台)です。ボーナスは月数で平均して表示しています。</p>
+  </div>
+  <div class="nav"><button class="btn ghost" data-go="0">戻る</button><button class="btn" data-go="4">住まいを選ぶ</button></div>
+</section>
+
+<!-- 2 -->
+<section class="panel" id="p4" data-title="住まい" data-min="6" hidden>
+  <h2>どこで、どんな部屋に住む?<span class="minutes">6分</span></h2>
+  <p class="lead">収入の次に大きいのが住居費です。新宿に通う前提で、区や市、広さで毎月の金額と通勤時間がどう変わるか確かめてください。</p>
+  <div class="card"><h3>住み方</h3><div class="grid2" id="homeOpts" role="radiogroup" aria-label="住み方"></div></div>
+  <div class="card">
+    <h3>住む場所<small>勤務先は新宿にある会社と仮定します</small></h3>
+    <div class="grid2" id="groupOpts" role="radiogroup" aria-label="エリアの種類"></div>
+    <div class="field" style="margin-top:12px"><label for="areaSel">区・市を選ぶ</label><select id="areaSel"></select></div>
+    <div class="callout" id="areaInfo"></div>
+    <p class="note" style="margin-top:10px" id="listIntro"></p>
+    <div class="nav" style="justify-content:flex-start;margin:8px 0 0;flex-wrap:wrap" id="listLinks"></div>
+  </div>
+  <div class="card" id="rentBox">
+    <h3>賃貸の部屋<small id="rentTitleNote"></small></h3>
+    <div class="row">
+      <div class="field" id="roomField"><label for="room">一人暮らしの間の部屋</label><select id="room"></select><span class="hint">結婚や子どもが増えると、広い部屋に引っ越す計算になります。</span></div>
+      <div class="field" id="exitField"><label for="parentExit">実家を出る年齢</label><select id="parentExit"></select><span class="hint">実家にいる間は、家に毎月3万円を入れる設定です。</span></div>
+    </div>
+    <div class="rooms" id="roomCards"></div>
+    <p class="note" style="margin:6px 0 12px">間取りは、広さの感覚をつかむための<b>イメージ図</b>です(写真ではありません)。カードを押すと部屋を選べます。</p>
+    <div class="callout" id="rentInfo"></div>
+  </div>
+  <div class="card" id="buyBox">
+    <h3>家を買う<small>住宅ローン35年</small></h3>
+    <div class="row">
+      <div class="field"><label for="buyAge">買う年齢</label><div class="val"><span id="buyAgev"></span><small>歳</small></div><input type="range" id="buyAge" min="25" max="50" step="1"></div>
+      <div class="field"><span class="lab">家の種類</span><div class="grid2" id="houseOpts" role="radiogroup" aria-label="家の種類"></div></div>
+    </div>
+    <div class="field"><label for="price">家の価格</label><div class="val"><span id="pricev"></span><small>万円</small></div><input type="range" id="price" min="1000" max="15000" step="100">
+      <div class="chips" id="priceQuick"></div></div>
+    <div class="row">
+      <div class="field"><label for="down">頭金(最初に自分で払う割合)</label><select id="down"><option value="0">0%(頭金なし)</option><option value="5">5%</option><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option></select></div>
+      <div class="field"><label for="rate">ローン金利(年)</label><div class="val"><span id="ratev"></span><small>%</small></div><input type="range" id="rate" min="0.5" max="4" step="0.1"></div>
+    </div>
+    <div class="callout" id="buyInfo"></div>
+  </div>
+  <div class="nav"><button class="btn ghost" data-go="3">戻る</button><button class="btn" data-go="5">車を選ぶ</button></div>
+</section>
+
+<!-- 3 -->
+<section class="panel" id="p5" data-title="車" data-min="3" hidden>
+  <h2>車を持つ? 持たない?<span class="minutes">3分</span></h2>
+  <p class="lead">車は、買う金額より「持ち続ける金額」が重いと言われます。税金・保険・車検・ガソリン・駐車場を全部入れて計算します。</p>
+  <div class="card"><h3>車</h3><div class="grid2" id="carOpts" role="radiogroup" aria-label="車"></div></div>
+  <div class="card" id="carDetail">
+    <h3>買い方</h3>
+    <div class="row">
+      <div class="field"><span class="lab">新車か中古か</span><div class="grid2" id="carNewOpts" role="radiogroup" aria-label="新車か中古か"></div></div>
+      <div class="field"><label for="carAge">最初に買う年齢</label><select id="carAge"></select><span class="hint">10年ごとに買い替え、5年ローン(金利3%)で払う設定です。</span></div>
+    </div>
+  </div>
+  <div class="callout" id="carInfo"></div>
+  <div class="nav"><button class="btn ghost" data-go="4">戻る</button><button class="btn" data-go="6">暮らしと家族へ</button></div>
+</section>
+
+<!-- 4 -->
+<section class="panel" id="p6" data-title="暮らし・家族" data-min="7" hidden>
+  <h2>毎日の暮らしと、家族<span class="minutes">7分</span></h2>
+  <p class="lead">自炊か、お弁当か、外食か。休日は出かけるか、レストランに行くか、飲み会や二次会に行くか。家賃と車以外のお金の使い方を決めます。結婚や子どもで増える分も入れます。</p>
+  <div class="card"><h3>暮らしのスタイル<small>選ぶと下の項目がまとめて変わります。あとから自分で変えられます</small></h3><div class="grid2" id="lifeOpts" role="radiogroup" aria-label="暮らしのスタイル"></div></div>
+  <div class="card">
+    <h3>毎日の食事</h3>
+    <div class="row">
+      <div class="field"><label for="bk">朝ごはん</label><select id="bk"></select></div>
+      <div class="field"><label for="lunch">平日の昼ごはん</label><select id="lunch"></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="cook">夕ごはんを自炊する日(1週間のうち)</label><div class="val"><span id="cookv"></span><small>日</small></div><input type="range" id="cook" min="0" max="7" step="1"></div>
+      <div class="field"><label for="dinnerOther">自炊しない日の夕ごはん</label><select id="dinnerOther"></select></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>休日・外食・飲み会<small>1か月あたり</small></h3>
+    <div class="row">
+      <div class="field"><label for="outing">休日に出かける回数</label><div class="val"><span id="outingv"></span><small>回</small></div><input type="range" id="outing" min="0" max="8" step="1"></div>
+      <div class="field"><label for="outKind">出かけ方(1回あたり)</label><select id="outKind"></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="resto">レストランに行く回数</label><div class="val"><span id="restov"></span><small>回</small></div><input type="range" id="resto" min="0" max="8" step="1"></div>
+      <div class="field"><label for="restoKind">行くお店(1人あたり)</label><select id="restoKind"></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="nomi">会社・友人の飲み会に行く回数</label><div class="val"><span id="nomiv"></span><small>回</small></div><input type="range" id="nomi" min="0" max="8" step="1"></div>
+      <div class="field"><label for="nijikai">二次会</label><select id="nijikai"></select><span class="hint">終電を逃すと、タクシー代や泊まり代がかかります。</span></div>
+    </div>
+    <h4 style="margin:16px 0 4px">身の回りのお金<small style="font-weight:400"> 光熱費・日用品(月1.8万円)は共通で入っています</small></h4>
+    <div class="row">
+      <div class="field"><label for="phoneP">スマホ・通信費</label><select id="phoneP"></select></div>
+      <div class="field"><label for="subs">サブスクの数(動画・音楽・ゲーム・電子書籍・クラウドなど)</label><div class="val"><span id="subsv"></span><small>件(1件 約1,100円)</small></div><input type="range" id="subs" min="0" max="12" step="1"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="cloth">洋服・靴・バッグ(月)</label><select id="cloth"></select></div>
+      <div class="field"><label for="beauty">美容(月)</label><select id="beauty"></select></div>
+    </div>
+    <div class="field"><label for="hobby">趣味・推し活・ゲーム課金(月)</label><select id="hobby"></select></div>
+    <h4 style="margin:16px 0 4px">デート・旅行・おつきあい</h4>
+    <div class="row">
+      <div class="field"><label for="date">恋人とのデートの回数(結婚するまで。1回 約8,000円)</label><div class="val"><span id="datev"></span><small>回 / 月</small></div><input type="range" id="date" min="0" max="8" step="1"></div>
+      <div class="field"><label for="trip">旅行</label><select id="trip"></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="wed">友人の結婚式に呼ばれる回数(25〜39歳。ご祝儀・服・交通費で1回 約3万円)</label><div class="val"><span id="wedv"></span><small>回 / 年</small></div><input type="range" id="wed" min="0" max="5" step="1"></div>
+      <div class="field"><label for="gift">親に渡す・プレゼントするお金</label><div class="val"><span id="giftv"></span><small>万円 / 月</small></div><input type="range" id="gift" min="0" max="5" step="0.5"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="pet">ペット</label><select id="pet"></select></div>
+      <div class="field"><label for="ins">民間の保険</label><select id="ins"></select></div>
+    </div>
+    <div class="field"><label for="gadget">PC・ゲーム機・家電(買い替えも含む)</label><select id="gadget"></select></div>
+    <div class="callout" id="lifeInfo"></div>
+  </div>
+  <div class="card">
+    <h3>結婚・子ども</h3>
+    <div class="row">
+      <div class="field"><label for="marry">結婚する年齢</label><select id="marry"></select></div>
+      <div class="field" id="spouseField"><label for="spouse">配偶者の収入</label><select id="spouse"></select><span class="hint">60歳までの収入として計算します。</span></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="kids">子どもの人数</label><select id="kids"></select></div>
+      <div class="field" id="kidAgeField"><label for="kidAge">最初の子が生まれる年齢</label><select id="kidAge"></select><span class="hint">2人目以降は2年おきです。</span></div>
+    </div>
+    <p class="note" id="kidNote"></p>
+  </div>
+  <div class="card" id="loanBox">
+    <h3>奨学金<small>借りた場合、就職後20年で返します</small></h3>
+    <div class="field"><label for="loan">借りた総額</label><div class="val"><span id="loanv"></span><small>万円</small></div><input type="range" id="loan" min="0" max="800" step="50"><span class="hint" id="loanHint"></span></div>
+  </div>
+  <div class="card">
+    <h3>もしもカード</h3>
+    <label class="check"><input type="checkbox" id="risk"><span>38歳のとき、勤めている会社が倒産して、半年間収入がゼロになる<span class="note"><br>失業手当などは入れていません。この年の収入が半分になる計算です。</span></span></label>
+  </div>
+  <div class="nav"><button class="btn ghost" data-go="5">戻る</button><button class="btn" data-go="7">結果を見る</button></div>
+</section>
+
+<!-- 5 -->
+<section class="panel" id="p7" data-title="結果" data-min="5" hidden>
+  <h2>あなたのライフプランの結果<span class="minutes">5分</span></h2>
+  <p class="lead" id="planLine"></p>
+  <div id="verdict" class="verdict"></div>
+  <div class="tiles" id="tiles"></div>
+  <div class="callout" id="wantCmp"></div>
+
+  <div class="card">
+    <h3>予想と計算を比べる</h3>
+    <div class="scroll"><table class="mini" id="cmpTbl"></table></div>
+    <p class="note" style="margin-top:8px" id="cmpNote"></p>
+  </div>
+
+  <div class="card">
+    <h3>ある年の1か月、お金はどこへ行く?</h3>
+    <div class="ages" id="ageBtns" role="group" aria-label="年齢を選ぶ"></div>
+    <div class="limitlab" id="segLab"></div>
+    <div class="seg" id="seg" role="img"></div>
+    <div class="legend" id="segLegend"></div>
+    <div class="scroll"><table class="mini" id="slipTbl"></table></div>
+  </div>
+
+  <div class="card">
+    <h3>年齢ごとの、入ってくるお金と出ていくお金<small>1年分・万円</small></h3>
+    <div class="legend" id="lgA"></div>
+    <div class="chart" id="chartA"></div>
+    <p class="note">棒の合計が線(手取り)より高い年は、貯金が減る年です。結婚式・頭金・引っ越しの初期費用は「一時的な出費」として入っています。</p>
+  </div>
+
+  <div class="card">
+    <h3>貯蓄の推移<small>万円・給料から使った残りの積み重ね</small></h3>
+    <div class="chart" id="chartB"></div>
+    <p class="note">0より下は、貯金ではなく借金が増えている状態です。退職金や年金は含めていません。</p>
+    <ul class="events" id="events"></ul>
+  </div>
+
+  <details class="card" id="leverBox"><summary>成り立たせるヒント(まず自分で考えてから開こう)</summary><ul class="note" id="leverList"></ul></details>
+
+  <details class="card"><summary>グラフの数字を表で見る</summary><div class="scroll"><table class="mini" id="allTbl"></table></div></details>
+
+  <div class="card">
+    <h3>このプランを保存して、条件を変えて比べる</h3>
+    <p class="note">進路・場所・車などを変えて、もう一度この画面に戻ると、プランどうしを並べて比べられます(最大4つ)。</p>
+    <div class="nav" style="justify-content:flex-start;margin:10px 0"><button class="btn ghost" id="savePlan">いまのプランを保存</button><button class="btn ghost" id="clearPlans">保存を消す</button></div>
+    <div class="scroll"><table class="mini saved" id="savedTbl"></table></div>
+  </div>
+  <div class="nav"><button class="btn ghost" data-go="6">条件を変える</button><button class="btn" data-go="8">ふりかえりへ</button></div>
+</section>
+
+<!-- 6 -->
+<section class="panel" id="p8" data-title="ふりかえり" data-min="4" hidden>
+  <h2>ふりかえり<span class="minutes">4分</span></h2>
+  <p class="lead">計算結果を見て、気づいたことと、これから動くことを書きましょう。</p>
+  <div class="card">
+    <div class="field"><label for="r1">1. 予想と計算で、いちばん違ったところはどこですか。</label><textarea id="r1"></textarea></div>
+    <div class="field"><label for="r2">2. このプランが成り立つために、変えられる条件は何ですか(進路・場所・車・家・家族のこと)。</label><textarea id="r2"></textarea></div>
+    <div class="field"><label for="r3">3. 高校2年生のいま、自分ができることを3つ書きましょう。</label><textarea id="r3"></textarea></div>
+    <div class="field"><label for="r4">4. 憧れの会社に入る人と比べて、いまの自分に足りないものは何ですか。数字で書きましょう(勉強時間、偏差値など)。</label><textarea id="r4"></textarea></div>
+    <div class="field"><label for="r5">5. 明日から毎日続ける勉強を、「何を・何分・いつ」で具体的に書きましょう。</label><textarea id="r5"></textarea></div>
+    <div class="field"><label for="r6">6. 面談で先生に相談したいことは何ですか。</label><textarea id="r6"></textarea></div>
+    <div class="nav" style="justify-content:flex-start;margin:6px 0 0"><button class="btn" id="copySummary">結果のまとめをコピー</button><span class="note" id="copyMsg" role="status" style="align-self:center"></span></div>
+    <p class="note" style="margin-top:8px">コピーした文章を、学校の提出用ツールなどに貼り付けて使えます。</p>
+  </div>
+  <div class="callout">考えるヒント: 同じ収入でも、住む場所や車で「手元に残るお金」は大きく変わります。成り立たなかったときは、あきらめる理由ではなく、動かせるレバーを探す合図です。進路、資格、就職先選び、住む場所、車や家を持つ時期。どこを動かすと、いちばん楽になりましたか。</div>
+
+  <details class="card" style="margin-top:16px"><summary>データの出典と、このシミュレーターの前提</summary>
+    <p class="note"><b>公表データを使った部分</b>(2026年11月時点で確認)</p>
+    <ul class="note">
+      <li>初任給(令和7年・厚生労働省「賃金構造基本統計調査」): 大学卒 約26.2万円、短大・高専卒 約23.6万円、専門学校卒 約23.1万円、高校卒 約20.7万円(所定内給与・額面)。</li>
+      <li>大学卒の年齢別賃金(令和6年・同調査、一般労働者): 20〜24歳 約25.1万円、30〜34歳 約32.5万円、40〜44歳 約40.6万円、50〜54歳 約49.1万円、55〜59歳 約52.4万円。年齢による伸び方のモデルはこれをもとにしています。</li>
+      <li>企業規模別の大卒男性の初任給(令和6年・同調査): 大企業 約26.0万円、中企業 約24.6万円、小企業 約23.9万円。</li>
+      <li>国税庁「民間給与実態統計調査」(令和6年分): 平均給与 478万円(男性587万円、女性333万円)。</li>
+      <li>家賃(東京都の区・市): 1Kの相場は「CHINTAI」の区市別データ(2026年11月3日更新)です。参考として、23区の30㎡以下の募集家賃は2026年2月に月11.0万円(アットホーム調査、前年同月比+12%)でした。</li>
+      <li>家の価格は区・市ごとの実際の相場ではなく、家賃から換算した目安です。実際の都心の新築マンションは、ここに出る価格より高いことが多いです。</li>
+      <li>新築マンション平均価格: 東京23区 1億3,784万円(2025年度・不動産経済研究所)。2025年の平均は、23区以外の東京都 6,699万円、神奈川県 7,165万円、埼玉県 6,420万円、千葉県 5,842万円。購入価格は年収の5〜7倍が一般的な目安とされます。</li>
+      <li>車の維持費: 軽自動車は年10〜15万円ほど、小型普通車は都市部の駐車場込みで年30万円近い(自動車情報サイトの解説)。このアプリでは項目ごとに積み上げ、ガソリンや保険を含めて少し高めに設定しています。</li>
+      <li>日本航空(JAL): 平均年収949万円・平均年齢39.7歳・大卒初任給25.1万円(2026年入社)。同社の公表資料による。</li>
+      <li>大卒求人倍率: 2027年卒は全体で1.62倍(リクルートワークス研究所)。従業員規模別は、2018年卒の数字で 5,000人以上 0.39倍・1,000〜4,999人 1.02倍・300〜999人 1.45倍・300人未満 6.45倍。古い数字ですが、「大手に応募が集中する」傾向を示す例として使っています。最新の規模別は研究所の資料で確認してください。</li>
+      <li>高校生の平日の勉強時間: ベネッセの2008年「生活時間調査」で、高校生の平日の勉強は平均 約73分(うち家庭学習 約62分)。古い調査なので、目安としてだけ使っています。</li>
+      <li>60〜64歳の賃金は55〜59歳より約2割低い(賃金統計の例)。</li>
+    </ul>
+    <p class="note" style="margin-top:8px"><b>推定(出典を示せない)部分</b>。授業用の仮定で、実際とは差があります。</p>
+    <ul class="note">
+      <li>食事・休日の外出・レストラン・飲み会・二次会の1回あたりの金額、二次会後のタクシー代(新宿までの時間×250円、最低4,000円)、そのほかの生活費、就職時の貯金(30万円)、手取り率(額面の約88%〜68%)、ボーナス月数(大手4.0・中堅3.0・中小2.0)、就職先の規模ごとの伸び方、学歴・進路ごとの伸び方。</li>
+      <li><b>勉強時間の必要量(偏差値40→50は約800時間、→60は約2,500時間、→65は約4,000時間 など)と、各会社に入る人が多い大学の偏差値帯</b>。公的な統計ではなく、一般的な受験の目安をもとにした推定です。個人差が大きく、先生が実態に合わせて直せる部分です。</li>
+      <li>各進路から就職先の規模への「届きやすさ」。学校の進路実績で確かめてください。</li>
+      <li>神奈川・埼玉・千葉の家賃(1K)、1LDK〜3LDKの家賃(1Kの家賃の1.3〜2.3倍で換算)、家の価格(1Kの家賃から換算。新築は家賃の約900〜1,000倍、中古は新築の約55%)、新宿までの所要時間(代表的な駅からの目安)、駐車場代、車の価格、生活費、結婚費用(200万円)、子どもの費用(1人あたり約2,300万円)、実家に入れるお金(3万円)、バイト・派遣の年収。</li>
+      <li>統計は平均です。実際の収入は、会社・職種・本人の働き方で大きく変わります。</li>
+    </ul>
+  </details>
+
+  <details class="card"><summary>先生向けメモ(40分の進め方)</summary>
+    <ol class="note">
+      <li>導入(2分): 予想を直感で入力させ、数字をノートに書かせる。</li>
+      <li>いまの自分(5分): 偏差値・勉強時間は正直に入れさせる。数字に自信がなければ先生が一緒に確認する。</li>
+      <li>憧れの会社(5分): 会社を選ばせ、事実の確認→勉強量のギャップを順に見せる。ここが授業の山場。「無理」と言うのではなく、「必要な量」を示す。勉強時間の目安は推定なので、実態に合わせて直してよい(p3の定数 HOURS)。</li>
+      <li>進路(3分): 「就職先の規模」は、自校の進路実績に近いものを選ばせる。大手を選ぶ生徒には「届きやすさ」の表示を読ませる。</li>
+      <li>住まい・車・暮らし(16分): 暮らしでは、昼食を弁当にした場合や二次会に行かない場合との差も比べさせる。 理想のセットから始め、場所と車を変えたときの変化を見る。</li>
+      <li>結果(5分): 予想と計算の差、「ある年の1か月」、貯蓄が赤字になる年齢を読み取る。条件を変えて2〜3パターン保存させる。</li>
+      <li>ふりかえり(4分): 「変えられる条件」と「いまできること」を書かせる。</li>
+    </ol>
+    <p class="note" style="margin-top:6px">配慮: 家庭の経済状況に触れないよう、「架空の自分」のシミュレーションとして扱ってください。目的は諦めさせることではなく、選択肢を広げる行動につなげることです。数字は目安なので、板書や別資料で最新の公的データも示してください。</p>
+  </details>
+  <div class="nav"><button class="btn ghost" data-go="7">結果に戻る</button><span></span></div>
+</section>
+</main>
+</div>
+
+<div class="bar" aria-live="polite"><div class="in" id="barIn"></div></div>
+
+<script>
+(function(){
+'use strict';
+/* ===== データ(出典と推定は本文の「データの出典と前提」参照) ===== */
+const LV=['ほぼ届かない','ごく一部','ふつう','多い'];
+const PATHS={
+  hs:{name:'高校卒で就職',desc:'18歳から働く。早く収入を得られるが、初任給と伸びは低め。',start:18,init:20.73,k:0.60,edu:'初任給の目安 20.7万円',fit:{big:1,mid:2,small:3},def:'small',
+      note:'製造・運輸・サービスなどで学校求人が多く、中小企業が中心です。'},
+  vo:{name:'専門学校(2年)→就職',desc:'20歳から働く。看護・福祉・IT・美容など、資格や技術で働く道。',start:20,init:23.07,k:0.75,edu:'初任給の目安 23.1万円',fit:{big:1,mid:2,small:3},def:'small',
+      note:'資格職(看護・介護福祉など)は、会社の規模より資格や夜勤などで給料が決まる面があります。ここでは一般的な事務・技術・販売系の平均で計算します。'},
+  univLow:{name:'大学(偏差値35〜45の私立大)→就職',desc:'22歳から働く。入りやすい大学の場合。就職先は中小企業が中心になりやすい。',start:22,init:26.23,k:0.85,edu:'初任給の目安 26.2万円',fit:{big:0,mid:1,small:3},def:'small',
+      note:'大学卒の初任給の平均は、大手に就職した人も含みます。入学時の学力に近い大学では、中小企業の割合が高くなる傾向があります。'},
+  univHi:{name:'大学(日大・東洋大クラス、偏差値50前後)→就職',desc:'22歳から働く。目標に近い、いわゆる日東駒専のクラス。',start:22,init:26.23,k:1.0,edu:'初任給の目安 26.2万円',fit:{big:1,mid:3,small:2},def:'mid',
+      note:'大手に就職する人もいますが、そのクラスの大学全体から見ると一部です。中堅企業が最も多い想定です。'},
+  part:{name:'正社員にならず、バイト・派遣で働く',desc:'18歳から働く(比較用)。昇給やボーナスがほとんどない場合。',start:18,init:0,k:0,edu:'年収の目安 190万円〜',fit:null,def:'small',
+      note:'正社員の就職活動をしなかった、または正社員になれなかった場合の比較用です。年収は190万円から始まり、毎年少しずつ上がって250万円で止まる設定です。'}
+};
+const RANKS={
+  big:{name:'大手(従業員1,000人以上)',initF:1.04,gF:1.20,bonus:4.0,desc:'ボーナスが多く、年を重ねるほど給料が上がりやすい。'},
+  mid:{name:'中堅(100〜999人)',initF:0.98,gF:0.95,bonus:3.0,desc:'平均に近い伸び方。'},
+  small:{name:'中小・小規模(〜99人)',initF:0.94,gF:0.75,bonus:2.0,desc:'初任給は近いが、10年後、20年後の差が出やすい。'}
+};
+const GROUPS={
+  g23:{name:'東京23区',desc:'新宿に近く、家賃と駐車場は高め。'},
+  gtama:{name:'東京の市部(多摩地域)',desc:'中央線・京王線・小田急線などで新宿へ。'},
+  gnear:{name:'神奈川・埼玉・千葉',desc:'都外から電車で新宿へ通う。家賃は推定を含む。'}
+};
+const AREAS={};
+/* [キー, 名前, 1Kの家賃(万円), 新宿までの目安(分), 推定フラグ] 東京都の1Kは「CHINTAI」2026年11月3日更新の相場。近郊は推定。 */
+const R23=[1,1.4,1.8,2.3], ROT=[1,1.3,1.65,2.05];
+function addAreas(group,pref,rows){
+  const r1=x=>Math.round(x*10)/10, R=group==='g23'?R23:ROT;
+  rows.forEach(r=>{
+    const k1=r[2], nw=Math.max(1000,Math.round(k1*(group==='g23'?1000:900)/100)*100);
+    AREAS[r[0]]={key:r[0],name:r[1],group,pref:r[5]||pref,min:r[3],est:!!r[4],
+      rent:{k1:r1(k1),ldk1:r1(k1*R[1]),ldk2:r1(k1*R[2]),ldk3:r1(k1*R[3])},
+      park:r1(k1*(group==='g23'?0.25:group==='gtama'?0.18:0.16)),
+      price:{new:nw,used:Math.round(nw*0.55/100)*100}};
+  });
+}
+addAreas('g23','tokyo',[
+ ['chiyoda','千代田区',14.6,12],['chuo','中央区',13.7,15],['minato','港区',14.9,15],['shinjuku','新宿区',13.8,5],
+ ['bunkyo','文京区',12.7,18],['taito','台東区',12.9,22],['sumida','墨田区',11.9,25],['koto','江東区',12.3,25],
+ ['shinagawa','品川区',12.3,20],['meguro','目黒区',14.3,18],['ota','大田区',11.2,30],['setagaya','世田谷区',11.0,20],
+ ['shibuya','渋谷区',13.8,7],['nakano','中野区',10.4,7],['suginami','杉並区',10.0,12],['toshima','豊島区',12.2,10],
+ ['kita','北区',10.4,18],['arakawa','荒川区',10.7,25],['itabashi','板橋区',9.9,25],['nerima','練馬区',9.2,25],
+ ['adachi','足立区',8.6,30],['katsushika','葛飾区',9.0,35],['edogawa','江戸川区',7.9,35]]);
+addAreas('gtama','tokyo',[
+ ['musashino','武蔵野市(吉祥寺)',8.3,20],['mitaka','三鷹市',7.6,20],['chofu','調布市',8.0,20],['komae','狛江市',10.05,25],
+ ['fuchu','府中市',8.35,25],['kokubunji','国分寺市',7.3,25],['koganei','小金井市',7.4,25],['tachikawa','立川市',8.2,30],
+ ['kunitachi','国立市',7.4,30],['nishitokyo','西東京市',7.2,35],['machida','町田市',7.2,35],['hino','日野市',6.0,35],
+ ['kodaira','小平市',6.4,35],['inagi','稲城市',7.5,35],['hachioji','八王子市',6.0,40],['tama','多摩市',5.35,40]]);
+addAreas('gnear','kanagawa',[
+ ['kawasaki','川崎市',7.5,30,1],['yokohama','横浜市',7.0,30,1],['sagamihara','相模原市(橋本)',5.5,45,1],
+ ['saitama','さいたま市(浦和・大宮)',6.8,30,1,'saitama'],['kawaguchi','川口市',7.0,30,1,'saitama'],
+ ['tokorozawa','所沢市',5.8,35,1,'saitama'],['koshigaya','越谷市',6.0,50,1,'saitama'],
+ ['ichikawa','市川市',7.0,40,1,'chiba'],['funabashi','船橋市',6.5,45,1,'chiba'],
+ ['matsudo','松戸市',6.2,50,1,'chiba'],['kashiwa','柏市',6.0,60,1,'chiba']]);
+const PREFS={tokyo:'東京都',kanagawa:'神奈川県',saitama:'埼玉県',chiba:'千葉県'};
+const ROOMS={k1:'ワンルーム・1K(約25㎡)',ldk1:'1LDK(約40㎡)',ldk2:'2LDK(約55㎡)',ldk3:'3LDK(約70㎡・家族向け)'};
+const CARS={
+  none:null,
+  kei:{name:'軽自動車',new:170,used:90,tax:1.1,ins:6,insp:5,gas:7},
+  compact:{name:'コンパクトカー',new:240,used:120,tax:3.0,ins:7,insp:7,gas:9},
+  van:{name:'ミニバン・SUV',new:350,used:180,tax:4.5,ins:8,insp:9,gas:12}
+};
+const LIFE={low:{name:'節約型',d:'お弁当と自炊が中心。遊びは控えめ'},normal:{name:'ふつう',d:'昼は買う、夜は半分自炊。たまに外食と飲み会'},high:{name:'ゆとり型',d:'外食と遊びを楽しむ。飲み会や二次会にも行く'}};
+const PRESETS={
+  low:{bk:'home',lunch:'bento',cook:6,dinnerOther:'deli',outing:2,outKind:'near',resto:0,restoKind:'chain',nomi:1,nijikai:'no',phoneP:'mvno',subs:1,cloth:'few',beauty:'cut',hobby:'few',date:0,trip:'none',pet:'none',ins:'none',gadget:'few',wed:1,gift:0},
+  normal:{bk:'home',lunch:'conv',cook:4,dinnerOther:'deli',outing:3,outKind:'city',resto:2,restoKind:'normal',nomi:2,nijikai:'no',phoneP:'big',subs:3,cloth:'season',beauty:'salon',hobby:'normal',date:1,trip:'dom1',pet:'none',ins:'none',gadget:'normal',wed:1,gift:0},
+  high:{bk:'conv',lunch:'teishoku',cook:3,dinnerOther:'out',outing:4,outKind:'city',resto:3,restoKind:'normal',nomi:3,nijikai:'half',phoneP:'wifi',subs:6,cloth:'trend',beauty:'esthe',hobby:'deep',date:4,trip:'abr1',pet:'yes',ins:'std',gadget:'many',wed:2,gift:2}};
+/* [表示名, 1回(1食)あたりの金額(円) など] 推定 */
+const OPT={
+  bk:{home:['自宅で簡単に',150],conv:['コンビニ・カフェ',450],skip:['食べない',0]},
+  lunch:{bento:['お弁当を持っていく',350],conv:['コンビニ・パンなど',750],teishoku:['社食・定食屋',950],out:['外食(新宿のランチ)',1300]},
+  dinnerOther:{deli:['惣菜・コンビニ・弁当',800],out:['外食(定食屋・チェーン店)',1400]},
+  outKind:{near:['近場で過ごす(カフェ・散歩)',1500],city:['都内で遊ぶ(買い物・映画・ライブ)',4000],far:['遠出・テーマパーク・旅行',12000]},
+  restoKind:{chain:['ファミレス・チェーン店',1200],normal:['ふつうのお店',2500],nice:['ちょっといいお店',6000]},
+  nijikai:{no:['行かない',0],half:['半分くらい行く',0.5],yes:['毎回行く',1]},
+  phoneP:{mvno:['格安SIM(Wi-Fiは家になし)',1500],big:['大手キャリア(端末代ふくむ)',7500],wifi:['大手キャリア+自宅のWi-Fi回線',10500]},
+  cloth:{few:['ほとんど買わない',3000],season:['季節ごとに数着',8000],trend:['流行を追って買う',15000],brand:['ブランド・靴・小物まで',30000]},
+  beauty:{cut:['散髪だけ',3000],salon:['美容院+スキンケア',8000],esthe:['美容院・脱毛・ネイル・エステなど',20000]},
+  trip:{none:['旅行はしない',0],dom1:['国内旅行 年1回',50000],dom2:['国内旅行 年2回',100000],abr1:['海外旅行 年1回',250000],both:['海外+国内 年3回',350000]},
+  pet:{none:['飼わない',0],yes:['犬か猫を飼う(月1.2万円)',12000]},
+  ins:{none:['入らない',0],std:['医療・がん保険など(月1万円)',10000],rich:['しっかり入る(月2.5万円)',25000]},
+  gadget:{few:['ほとんど買わない(年2万円)',20000],normal:['PC・ゲーム機などを時々(年6万円)',60000],many:['新作をどんどん(年15万円)',150000]},
+  hobby:{few:['ほとんどなし',3000],normal:['ふつう(ゲーム課金・趣味)',15000],deep:['どっぷり(推し活・ライブ・遠征)',40000]}
+};
+const FIXED_LIVE=18000, SUB_COST=1100; // 光熱費1.2万+日用品0.6万(推定)、サブスク1件あたり平均
+const NOMI_COST=4500, NIJIKAI_COST=3000, COOK_COST=550;
+function taxiCost(min){ return Math.max(4000,min*250); }
+function liveParts(S){
+  const o=k=>OPT[k][S[k]][1];
+  const p={util:FIXED_LIVE,phone:o('phoneP'),subs:S.subs*SUB_COST,cloth:o('cloth'),beauty:o('beauty'),hobby:o('hobby')};
+  p.total=(p.util+p.phone+p.subs+p.cloth+p.beauty+p.hobby)/10000; return p;
+}
+function lifeCosts(S,A,mult,parent,age,married){
+  age=age||25;
+  const o=k=>OPT[k][S[k]][1];
+  const cookDays=30*S.cook/7, other=Math.max(0,30-cookDays-S.nomi-S.resto);
+  const food=(o('bk')*30+o('lunch')*22+400*8+cookDays*COOK_COST+other*o('dinnerOther'))/10000*(parent?0.6:1);
+  const nij=S.nomi*o('nijikai')*(NIJIKAI_COST+0.5*taxiCost(A.min));
+  const dating=married?0:S.date*8000, wed=(age<=39?S.wed*30000/12:0), trip=o('trip')/12*Math.min(mult,1.8);
+  const fun=(dating+wed+trip+S.outing*o('outKind')*mult+S.resto*o('restoKind')*mult+S.nomi*NOMI_COST+nij)/10000;
+  const pm=(parent?0.6:1), live=liveParts(S).total*pm+(o('pet')+o('ins')+o('gadget')/12)/10000+S.gift;
+  return {food,fun,live,nomi:(S.nomi*NOMI_COST+nij)/10000,nij:nij/10000};
+}
+function presetOf(S){ for(const k of Object.keys(PRESETS)){ const p=PRESETS[k]; if(Object.keys(p).every(f=>String(S[f])===String(p[f]))) return k; } return 'custom'; }
+const SPOUSE={none:{v:0,name:'収入なし(専業)'},part:{v:110,name:'パート・時短(年110万円)'},full:{v:300,name:'正社員(年300万円)'}};
+const TH=[[0,.90],[100,.88],[200,.84],[300,.81],[400,.79],[500,.77],[600,.76],[700,.75],[800,.74],[1000,.72],[1500,.68],[3000,.60]];
+const IT=[0,5,10,15,20,25,30,35], IV=[1,1.15,1.31,1.47,1.63,1.85,1.98,2.11];
+const ROOM_ORDER=['k1','ldk1','ldk2','ldk3'];
+const END_AGE=64;
+
+/* ===== 計算 ===== */
+function idx(t){
+  if(t<=0) return 1; if(t>=35) return IV[7];
+  for(let i=1;i<IT.length;i++){ if(t<=IT[i]){ const r=(t-IT[i-1])/(IT[i]-IT[i-1]); return IV[i-1]+(IV[i]-IV[i-1])*r; } }
+  return IV[7];
+}
+function th(g){
+  if(g<=0) return 0;
+  for(let i=1;i<TH.length;i++){ if(g<=TH[i][0]){ const r=(g-TH[i-1][0])/(TH[i][0]-TH[i-1][0]); return g*(TH[i-1][1]+(TH[i][1]-TH[i-1][1])*r); } }
+  return g*0.6;
+}
+function grossSelf(S,a){
+  const P=PATHS[S.path]; let g;
+  if(S.path==='part'){ g=Math.min(190+2.5*(a-18),250); }
+  else{ const R=RANKS[S.rank]; const m=P.init*R.initF*(1+(idx(a-P.start)-1)*P.k*R.gF); g=m*(12+R.bonus); }
+  if(a>=60) g*=0.8;
+  if(S.risk && a===38) g*=0.5;
+  return g;
+}
+function annuity(amount,annualRate,months){
+  if(amount<=0) return 0; const r=annualRate/12;
+  return r===0? amount/months : amount*r/(1-Math.pow(1+r,-months));
+}
+function buyCalc(S){
+  const price=S.price, down=price*S.down/100, loanAmt=price-down, fees=price*0.07;
+  const payM=annuity(loanAmt,S.rate/100,420);
+  const maint=price*0.004/12+(S.houseType==='mansion'?2.5:1.5);
+  return {price,down,loanAmt,fees,payM,maint};
+}
+function simulate(S){
+  const P=PATHS[S.path], A=AREAS[S.area], B=buyCalc(S), car=CARS[S.car];
+  const rows=[]; let bal=30, prevHouse=null; // 就職時の貯金 30万円
+  const births=[]; for(let i=0;i<S.kids;i++) births.push(S.kidAge+2*i);
+  const buyAge=Math.max(S.buyAge,P.start);
+  const carFirst=Math.max(S.carAge,P.start);
+  const carBuys=[]; if(car){ for(let a=carFirst;a<=55;a+=10) carBuys.push(a); }
+  const carPay=car? annuity(car[S.carNew],0.03,60):0;
+  const exit=Math.min(S.parentExit, S.marry>0?S.marry:999);
+  for(let a=P.start;a<=END_AGE;a++){
+    const ev=[];
+    const g=grossSelf(S,a);
+    const married=S.marry>0 && a>=S.marry;
+    const gs=(married && a<=60)? SPOUSE[S.spouse].v:0;
+    const net=th(g)+th(gs);
+    let kidMon=0, living=0;
+    births.forEach((b,i)=>{ const c=a-b; if(c===0) ev.push('第'+(i+1)+'子が生まれる'); if(c>=0&&c<=21){ living++; kidMon+= c<=15?7:12; } });
+    const need=living>=2?3:living===1?2:married?1:0;
+    const rentKey=ROOM_ORDER[Math.max(ROOM_ORDER.indexOf(S.room),need)];
+    const rentVal=A.rent[rentKey];
+    let key, houseMon, one=0;
+    if(S.home==='parent' && a<exit){ key='parent'; houseMon=3; }
+    else if(S.home==='buy' && a>=buyAge){ key='own'; houseMon=(a<buyAge+35?B.payM:0)+B.maint; }
+    else { key='rent:'+rentKey; houseMon=rentVal; }
+    if(key!==prevHouse){
+      if(key==='own'){ one+=B.down+B.fees; ev.push('家を買う('+Math.round(B.price).toLocaleString('ja-JP')+'万円)'); }
+      else if(key.indexOf('rent')===0){ one+=rentVal*3; ev.push(prevHouse==='parent'?'実家を出る':prevHouse===null?'賃貸暮らしのスタート':'引っ越し'); }
+      prevHouse=key;
+    }
+    let carMon=0;
+    if(car && a>=carFirst){
+      let run=car.tax+(a<26?car.ins*1.8:car.ins)+car.insp+car.gas;
+      const free=key==='parent'||(key==='own'&&S.houseType==='house');
+      run+= free?0:A.park*12;
+      carMon=run/12;
+      carBuys.forEach(b=>{ if(a>=b&&a<b+5) carMon+=carPay; if(a===b) ev.push('車を買う('+car.name+')'); });
+    }
+    const lc=lifeCosts(S,A,1+(married?0.8:0)+0.5*living,key==='parent',a,married);
+    const famMon=(married?6:0)+kidMon;
+    if(married && a===S.marry){ one+=200; ev.push('結婚'); }
+    const schMon=(S.loan>0 && S.path!=='hs' && S.path!=='part' && a<P.start+20)? S.loan/240:0;
+    if(S.risk && a===38) ev.push('会社が倒産(半年間、収入なし)');
+    const hous=houseMon*12, carA=carMon*12, food=lc.food*12, fun=lc.fun*12, live=lc.live*12, fam=famMon*12, sch=schMon*12;
+    const exp=hous+carA+food+fun+live+fam+sch+one;
+    const save=net-exp; bal+=save;
+    rows.push({age:a,gross:g,grossSp:gs,net,tax:g+gs-net,hous,car:carA,food,fun,live,fam,sch,one,exp,save,bal,ev,houseKey:key,rentKey});
+  }
+  let min=Infinity,minAge=0,firstNeg=null;
+  rows.forEach(r=>{ if(r.bal<min){min=r.bal;minAge=r.age;} if(firstNeg===null&&r.bal<0) firstNeg=r.age; });
+  const final=rows[rows.length-1].bal;
+  const level= firstNeg!==null?'ng': final>=1000?'ok':'tight';
+  return {rows,min,minAge,firstNeg,final,level,B,buyAge,carFirst};
+}
+function rowAt(sim,age){ return sim.rows.find(r=>r.age===age)||null; }
+
+/* ===== 就職の現実:憧れの会社・勉強量 ===== */
+// 偏差値40を基準にした、「その偏差値に届くまでに積み上げる勉強時間」(推定。先生が実態に合わせて直してよい)
+const HOURS=[[30,-300],[35,-150],[40,0],[45,300],[50,800],[55,1500],[60,2500],[65,4000],[70,6000],[75,9000]];
+function hoursAt(d){
+  if(d<=HOURS[0][0]) return HOURS[0][1];
+  for(let i=1;i<HOURS.length;i++){ if(d<=HOURS[i][0]){ const a=HOURS[i-1],b=HOURS[i]; return a[1]+(b[1]-a[1])*(d-a[0])/(b[0]-a[0]); } }
+  return HOURS[HOURS.length-1][1];
+}
+function devAfter(dev,addHours){
+  const target=hoursAt(dev)+addHours;
+  if(target<=HOURS[0][1]) return HOURS[0][0];
+  for(let i=1;i<HOURS.length;i++){ if(target<=HOURS[i][1]){ const a=HOURS[i-1],b=HOURS[i]; return a[0]+(b[0]-a[0])*(target-a[1])/(b[1]-a[1]); } }
+  return HOURS[HOURS.length-1][0];
+}
+function daysToExam(now){ // 共通テスト(2028年1月中旬)まで
+  const d=Math.ceil((new Date(2028,0,15)-(now||new Date()))/864e5);
+  return Math.max(60,Math.min(d,700));
+}
+function studyDaily(S){ return (S.wkStudy*5+S.holStudy*2)/7/60; } // 時間/日
+const DREAMS={
+  jal:{name:'日本航空(JAL)',cat:'航空会社',req:62,
+    facts:['平均年収 949万円、平均年齢 39.7歳、大卒の初任給 25.1万円(2026年入社・同社の公表)'],
+    est:['事務・技術系の総合職は、難関〜上位大学の出身者が中心とされる','客室乗務員・グランドスタッフなど、ほかの採用区分もある(応募条件は募集要項で確認)'],
+    note:'年収は高い会社ですが、その分、入りたい人も多く集まります。'},
+  trading:{name:'総合商社(三菱商事・伊藤忠など)',cat:'商社',req:68,
+    facts:[],est:['新卒の採用は少人数で、難関大学の出身者が大きな割合を占める(推定)'],note:'年収は高いと言われますが、入るための競争は日本の企業でも最上位の一つです。'},
+  bigmaker:{name:'誰でも知っている大手メーカー・大手銀行',cat:'大手',req:60,
+    facts:['大卒求人倍率: 従業員5,000人以上は0.39倍(2018年卒)。求人より応募者のほうが多い'],
+    est:['大学名で応募者を絞る会社も多い(推定)','上位大学(MARCH以上)の出身者が中心になることが多い(推定)'],note:'大手に入りたい人が集まるため、倍率が高くなります。'},
+  gov:{name:'公務員(市役所・警察・消防など)',cat:'公務員',req:50,
+    facts:[],est:['筆記試験があり、試験勉強が必要(科目は自治体による)','高校卒業程度と大学卒業程度の試験がある'],note:'給料の面で安定しやすい仕事ですが、試験に合格するための勉強が必要です。'},
+  mid:{name:'名前は知らないけれど、堅実な中堅企業',cat:'中堅',req:48,
+    facts:['大卒求人倍率: 従業員1,000〜4,999人は1.02倍、300〜999人は1.45倍(2018年卒)'],
+    est:['日東駒専〜大東亜帝国くらいの大学から入る人もいる(推定)'],note:'探せば入れる会社はあります。ただし、会社を知らないと選べません。'},
+  small:{name:'中小企業・手に職をつける仕事',cat:'中小',req:40,
+    facts:['大卒求人倍率: 従業員300人未満は6.45倍(2018年卒)。求人が多い'],
+    est:['地域の優良企業・専門職・技能職など、仕事の幅が広い'],note:'求人は多い。ただし、会社ごとの差が大きいので、選ぶ目が必要です。'},
+  none:{name:'まだわからない',cat:'未定',req:40,facts:[],est:[],note:'わからないときは、いまの勉強の習慣を作ることが、いちばん選択肢を広げます。'}
+};
+const EIKEN=[['none','持っていない'],['g3','3級'],['p2','準2級'],['g2','2級'],['p1','準1級以上']];
+const HOMEWORK=[['always','ほとんど毎回出す'],['often','たまに出し忘れる'],['rare','あまり出さない']];
+
+// 偏差値帯と大学名の例(推定。予備校・学部で数字は変わる)
+const UNIV=[
+  [65,'難関大','早稲田・慶應・上智・東京理科・旧帝大など'],
+  [60,'MARCH・関関同立クラス','明治・青山学院・立教・中央・法政、関西・関西学院・同志社・立命館など'],
+  [55,'中上位私大','成蹊・成城・明治学院・獨協・國學院・武蔵、芝浦工業、東京都市など'],
+  [50,'日東駒専クラス','日本大・東洋大・駒澤・専修、産近甲龍など'],
+  [45,'大東亜帝国クラス','大東文化・東海・亜細亜・帝京・国士舘、神奈川・千葉工業など'],
+  [38,'入りやすい私大クラス','定員を満たしにくい大学・総合型や推薦で入る人が多い大学'],
+  [0,'大学はむずかしい','専門学校・短大・就職を考える範囲']
+];
+function univOf(dev){ for(const u of UNIV){ if(dev>=u[0]-0.01) return u; } return UNIV[UNIV.length-1]; }
+const SCHOOL_MAX=55; // この学校で進める最高ライン(日大・東洋の上のほう。先生が調整)
+const GOALS=[['auto','会社に合わせる']].concat([[65,'難関大(早慶など)'],[60,'MARCH・関関同立'],[55,'中上位私大(成成明学獨國武)'],[50,'日東駒専'],[45,'大東亜帝国']].map(a=>[String(a[0]),a[1]+'(偏差値'+a[0]+'〜)']));
+/* ===== 画面の状態と操作 ===== */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const fmt=n=>Math.round(n).toLocaleString('ja-JP');
+const f1=n=>(Math.round(n*10)/10).toLocaleString('ja-JP',{minimumFractionDigits:1,maximumFractionDigits:1});
+const sgn=n=>(Math.round(n)>0?'+':Math.round(n)<0?'−':'')+fmt(Math.abs(n));
+const sgn1=n=>(Math.round(n*10)>0?'+':Math.round(n*10)<0?'−':'')+f1(Math.abs(n));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const STORE='mirai-kakeibo-v1';
+function store(k,v){ try{ localStorage.setItem(STORE+':'+k,v); }catch(e){} }
+function recall(k){ try{ return localStorage.getItem(STORE+':'+k); }catch(e){ return null; } }
+
+const S={net25:25,gross35:600,path:'vo',rank:'small',home:'rent',area:'nerima',groupPick:{g23:'nerima',gtama:'kokubunji',gnear:'kawaguchi'},room:'k1',parentExit:27,
+  buyAge:35,houseType:'mansion',price:4000,priceKind:'used',down:10,rate:1.8,
+  car:'none',carNew:'used',carAge:25,life:'normal',bk:'home',lunch:'conv',cook:4,dinnerOther:'deli',outing:3,outKind:'city',resto:2,restoKind:'normal',nomi:2,nijikai:'no',phoneP:'big',subs:3,cloth:'season',beauty:'salon',hobby:'normal',marry:0,spouse:'part',kids:0,kidAge:30,loan:0,risk:false,slipAge:35,
+  dev:40,hyotei:3.0,eiken:'none',homework:'often',wkStudy:30,holStudy:60,phone:4,testAvg:40,vocab:1000,goalUniv:'auto',dream:'bigmaker',addMin:0,wantFree:10,wantSave:2000,wage:1100,hrs:10,date:1,trip:'dom1',pet:'none',ins:'none',gadget:'normal',wed:1,gift:0};
+const W={car:false,house:false,marry:false,kids:false};
+let cur=0, sim=null, plans=[];
+
+function buildRadios(id,key,items,after){
+  const c=$('#'+id);
+  c.innerHTML=items.map(it=>'<label class="opt"><input type="radio" name="'+id+'" value="'+it.v+'"><span class="b"><span class="t">'+esc(it.t)+'</span><span class="d">'+esc(it.d||'')+'</span>'+(it.chips?'<span class="chips">'+it.chips+'</span>':'')+'</span></label>').join('');
+  c.addEventListener('change',e=>{ if(e.target.type==='radio'){ S[key]=e.target.value; if(after) after(); update(); } });
+}
+function fillSelect(id,opts){ $('#'+id).innerHTML=opts.map(o=>'<option value="'+o[0]+'">'+esc(o[1])+'</option>').join(''); }
+function range(a,b){ const r=[]; for(let i=a;i<=b;i++) r.push(i); return r; }
+function areaChanged(){ S.groupPick[AREAS[S.area].group]=S.area; if(S.priceKind) S.price=AREAS[S.area].price[S.priceKind]; }
+let lastGroup=null;
+function areaLabel(a){ return a.name+'(新宿まで約'+a.min+'分)'; }
+function fillAreaSel(g){ fillSelect('areaSel',Object.keys(AREAS).filter(k=>AREAS[k].group===g).map(k=>[k,areaLabel(AREAS[k])])); }
+function fillPlaceSel(){
+  $('#wPlace').innerHTML=Object.keys(GROUPS).map(g=>'<optgroup label="'+esc(GROUPS[g].name)+'">'+Object.keys(AREAS).filter(k=>AREAS[k].group===g).map(k=>'<option value="'+k+'">'+esc(areaLabel(AREAS[k]))+'</option>').join('')+'</optgroup>').join('');
+}
+
+function init(){
+  areaChanged();
+  const shortRank={big:'大手',mid:'中堅',small:'中小'};
+  buildRadios('pathOpts','path',Object.keys(PATHS).map(k=>{ const P=PATHS[k];
+    let chips='<span class="chip">'+esc(P.edu)+'</span>';
+    if(P.fit) chips+=['big','mid','small'].map(r=>'<span class="chip l'+P.fit[r]+'">'+shortRank[r]+': '+LV[P.fit[r]]+'</span>').join('');
+    return {v:k,t:P.name,d:P.desc,chips}; }),()=>{ S.rank=PATHS[S.path].def; });
+  buildRadios('rankOpts','rank',Object.keys(RANKS).map(k=>({v:k,t:RANKS[k].name,d:RANKS[k].desc,chips:'<span class="chip" data-fit="'+k+'"></span>'})));
+  buildRadios('homeOpts','home',[
+    {v:'parent',t:'実家で暮らす',d:'家に毎月3万円を入れる。貯金はしやすい。'},
+    {v:'rent',t:'賃貸で暮らす',d:'ずっと家賃を払う。引っ越しはしやすい。'},
+    {v:'buy',t:'家を買う',d:'住宅ローンを払う。買うまでは賃貸。'}]);
+  buildRadios('groupOpts','areaGroup',Object.keys(GROUPS).map(k=>({v:k,t:GROUPS[k].name,d:GROUPS[k].desc})),()=>{ S.area=S.groupPick[S.areaGroup]; areaChanged(); });
+  buildRadios('houseOpts','houseType',[{v:'mansion',t:'マンション',d:'管理費・修繕積立金が毎月かかる'},{v:'house',t:'一戸建て',d:'駐車場が不要。修繕は自分で準備'}]);
+  buildRadios('carOpts','car',[
+    {v:'none',t:'車は持たない',d:'電車・自転車・カーシェアなどで暮らす。'},
+    {v:'kei',t:'軽自動車',d:'新車170万円・中古90万円ほど',chips:'<span class="chip">税金が安い</span>'},
+    {v:'compact',t:'コンパクトカー',d:'新車240万円・中古120万円ほど'},
+    {v:'van',t:'ミニバン・SUV',d:'新車350万円・中古180万円ほど',chips:'<span class="chip">家族向け</span>'}]);
+  buildRadios('carNewOpts','carNew',[{v:'new',t:'新車',d:'高いが長く安心して乗れる'},{v:'used',t:'中古車',d:'価格はおよそ半分'}]);
+  buildRadios('lifeOpts','life',Object.keys(LIFE).map(k=>({v:k,t:LIFE[k].name,d:LIFE[k].d})),()=>{ Object.assign(S,PRESETS[S.life]); });
+
+  fillPlaceSel();
+  fillSelect('eiken',EIKEN); fillSelect('homework',HOMEWORK); fillSelect('goalUniv',GOALS); 
+  buildRadios('dreamOpts','dream',Object.keys(DREAMS).map(k=>({v:k,t:DREAMS[k].name,d:DREAMS[k].cat})));
+  ['dev','hyotei','wkStudy','holStudy','phone','addMin','testAvg','vocab','wantFree','wantSave','wage','hrs'].forEach(id=>$('#'+id).addEventListener('input',e=>{ S[id]=parseFloat(e.target.value); update(); }));
+  ['eiken','homework','goalUniv'].forEach(id=>$('#'+id).addEventListener('input',e=>{ S[id]=e.target.value; update(); }));
+  const price=k=>Object.keys(OPT[k]).map(v=>[v,OPT[k][v][0]+(k==='nijikai'?'':' 約'+fmt(OPT[k][v][1])+'円')]);
+  ['bk','lunch','dinnerOther','outKind','restoKind','nijikai','phoneP','cloth','beauty','hobby'].forEach(k=>fillSelect(k,price(k)));
+  ['trip','pet','ins','gadget'].forEach(k=>fillSelect(k,Object.keys(OPT[k]).map(v=>[v,OPT[k][v][0]])));
+  fillSelect('room',[['k1',ROOMS.k1],['ldk1',ROOMS.ldk1],['ldk2',ROOMS.ldk2]]);
+  fillSelect('parentExit',range(22,40).map(a=>[a,a+'歳']).concat([[99,'ずっと実家']]));
+  fillSelect('carAge',range(20,40).map(a=>[a,a+'歳']));
+  fillSelect('marry',[[0,'結婚しない']].concat(range(24,40).map(a=>[a,a+'歳'])));
+  fillSelect('spouse',Object.keys(SPOUSE).map(k=>[k,SPOUSE[k].name]));
+  fillSelect('kids',[[0,'いない'],[1,'1人'],[2,'2人'],[3,'3人']]);
+  fillSelect('kidAge',range(24,42).map(a=>[a,a+'歳']));
+
+  ['net25','gross35','buyAge','price','down','rate','loan','carAge','marry','kids','kidAge','parentExit','cook','outing','resto','nomi','subs','date','wed','gift'].forEach(id=>{
+    $('#'+id).addEventListener('input',e=>{ S[id]=parseFloat(e.target.value); if(id==='price') S.priceKind=null; S.life=presetOf(S); update(); });
+  });
+  ['room','spouse','bk','lunch','dinnerOther','outKind','restoKind','nijikai','phoneP','cloth','beauty','hobby','trip','pet','ins','gadget'].forEach(id=>$('#'+id).addEventListener('input',e=>{ S[id]=e.target.value; S.life=presetOf(S); update(); }));
+  $('#wPlace').addEventListener('input',e=>{ S.area=e.target.value; areaChanged(); update(); });
+  $('#areaSel').addEventListener('input',e=>{ S.area=e.target.value; areaChanged(); update(); });
+  $('#risk').addEventListener('change',e=>{ S.risk=e.target.checked; update(); });
+  [['wCar','car'],['wHouse','house'],['wMarry','marry'],['wKids','kids']].forEach(([id,k])=>$('#'+id).addEventListener('change',e=>{ W[k]=e.target.checked; applyWishes(); update(); }));
+
+  $('#steps').innerHTML=$$('.panel').map((p,i)=>'<li><button type="button" data-step="'+i+'"><small>'+(i+1)+'・'+p.dataset.min+'分</small>'+esc(p.dataset.title)+'</button></li>').join('');
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('[data-go],[data-step]'); if(!b) return;
+    go(parseInt(b.dataset.go!==undefined?b.dataset.go:b.dataset.step,10));
+  });
+  $('#savePlan').addEventListener('click',savePlan);
+  $('#clearPlans').addEventListener('click',()=>{ plans=[]; store('plans','[]'); renderSaved(); });
+  $('#copySummary').addEventListener('click',copySummary);
+  ['r1','r2','r3','r4','r5','r6'].forEach(id=>{ const v=recall(id); if(v) $('#'+id).value=v; $('#'+id).addEventListener('input',e=>store(id,e.target.value)); });
+  try{ plans=JSON.parse(recall('plans')||'[]'); if(!Array.isArray(plans)) plans=[]; }catch(e){ plans=[]; }
+  let lastW=0;
+  const ro=new ResizeObserver(()=>{ const w=$('#chartA').clientWidth; if(cur===7&&w&&w!==lastW){ lastW=w; renderCharts(); renderSeg(); } });
+  ro.observe($('#chartA'));
+  go(0);
+}
+function applyWishes(){
+  S.car=W.car?'compact':'none'; if(W.car) S.carNew='new';
+  if(W.house){ S.home='buy'; S.buyAge=35; S.priceKind='new'; S.price=AREAS[S.area].price.new; } else if(S.home==='buy'){ S.home='rent'; }
+  S.marry=W.marry?30:0; S.kids=W.kids?2:0; if(W.kids) S.kidAge=31;
+}
+function syncControls(){
+  ['dev','hyotei','wkStudy','holStudy','phone','addMin','testAvg','vocab','eiken','homework','goalUniv'].forEach(id=>{ const el=$('#'+id); if(String(el.value)!==String(S[id])) el.value=S[id]; });
+  ['dev','hyotei','wkStudy','holStudy','phone','addMin','testAvg','vocab','wantFree','wantSave','wage','hrs','date','wed','gift'].forEach(id=>{ $('#'+id+'v').textContent=(id==='hyotei'||id==='phone'||id==='gift')?f1(S[id]):fmt(S[id]); });
+  ['net25','gross35','buyAge','price','down','rate','loan','carAge','marry','kids','kidAge','parentExit','room','spouse','cook','outing','resto','nomi','subs','date','wed','gift','wantFree','wantSave','wage','hrs','trip','pet','ins','gadget','bk','lunch','dinnerOther','outKind','restoKind','nijikai','phoneP','cloth','beauty','hobby'].forEach(id=>{
+    const el=$('#'+id); if(String(el.value)!==String(S[id])) el.value=S[id]; });
+  const grp=AREAS[S.area].group; if(lastGroup!==grp){ lastGroup=grp; fillAreaSel(grp); }
+  $('#areaSel').value=S.area; $$('#groupOpts input').forEach(i=>{ i.checked=(i.value===grp); });
+  $('#wPlace').value=S.area; $('#risk').checked=S.risk;
+  $('#wCar').checked=W.car; $('#wHouse').checked=W.house; $('#wMarry').checked=W.marry; $('#wKids').checked=W.kids;
+  [['dreamOpts','dream'],['pathOpts','path'],['rankOpts','rank'],['homeOpts','home'],['houseOpts','houseType'],['carOpts','car'],['carNewOpts','carNew'],['lifeOpts','life']].forEach(p=>{
+    $$('#'+p[0]+' input').forEach(i=>{ i.checked=(i.value===S[p[1]]); }); });
+  $('#net25v').textContent=S.net25; $('#gross35v').textContent=fmt(S.gross35);
+  $('#buyAgev').textContent=S.buyAge; $('#pricev').textContent=fmt(S.price); $('#ratev').textContent=f1(S.rate); $('#loanv').textContent=fmt(S.loan); $('#cookv').textContent=S.cook; $('#outingv').textContent=S.outing; $('#restov').textContent=S.resto; $('#nomiv').textContent=S.nomi; $('#subsv').textContent=S.subs;
+}
+function go(i){
+  cur=i;
+  $$('.panel').forEach((p,k)=>{ p.hidden=(k!==i); });
+  $$('#steps button').forEach((b,k)=>{ if(k===i) b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); });
+  update();
+  const rm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(i>0||window.scrollY>0) $('#steps').scrollIntoView({behavior:rm?'auto':'smooth',block:'start'});
+}
+function update(){
+  sim=simulate(S); syncControls(); renderBar();
+  [renderIdeal,renderNow,renderDream,renderPath,renderHome,renderCar,renderLife,renderResult,renderReflect][cur]();
+}
+/* ===== 各画面の表示 ===== */
+const num=n=>(Math.round(n)<0?'−':'')+fmt(Math.abs(n));
+const num1=n=>(Math.round(n*10)<0?'−':'')+f1(Math.abs(n));
+const HOMETXT={parent:'実家',rent:'賃貸',buy:'持ち家'};
+
+function renderBar(){
+  const f=sim.final;
+  $('#barIn').innerHTML='<span class="tag">いまのプラン</span>'
+    +'<span>65歳の貯蓄 <b class="'+(f<0?'bad':'good')+'">'+num(f)+'万円</b></span>'
+    +'<span>'+(sim.firstNeg!==null?'<b class="bad">'+sim.firstNeg+'歳で貯蓄がマイナス</b>':'<b class="good">貯蓄は一度もマイナスにならない</b>')+'</span>';
+}
+function renderIdeal(){}
+function renderReflect(){}
+
+function renderPath(){
+  const P=PATHS[S.path];
+  $('#rankOpts').closest('.card').hidden=(S.path==='part');
+  $('#pathNote').textContent=P.note;
+  if(S.path!=='part'){
+    $$('#rankOpts [data-fit]').forEach(ch=>{ const lv=P.fit[ch.dataset.fit]; ch.className='chip l'+lv; ch.textContent='この進路から: '+LV[lv]; });
+    const lv=P.fit[S.rank];
+    $('#rankNote').textContent=RANKS[S.rank].desc+(lv<=1?' ただし、この進路から「'+RANKS[S.rank].name+'」に入れる人は「'+LV[lv]+'」です。学校の進路実績で確かめましょう。':'');
+  }
+  const ages=[25,35,45];
+  const g=ages.map(a=>grossSelf(S,a));
+  $('#incomeTbl').innerHTML='<thead><tr><th></th>'+ages.map(a=>'<th>'+a+'歳</th>').join('')+'</tr></thead><tbody>'
+    +'<tr><td>年収(額面・ボーナス込み)</td>'+g.map(v=>'<td><b>'+fmt(v)+'</b>万円</td>').join('')+'</tr>'
+    +'<tr><td>手取りの年収</td>'+g.map(v=>'<td>'+fmt(th(v))+'万円</td>').join('')+'</tr>'
+    +'<tr><td>毎月の手取り(ボーナス込みの平均)</td>'+g.map(v=>'<td><b>'+f1(th(v)/12)+'</b>万円</td>').join('')+'</tr>'
+    +'<tr><td>さっきの予想</td><td>手取り月 '+S.net25+'万円</td><td>年収 '+fmt(S.gross35)+'万円</td><td>—</td></tr></tbody>';
+}
+
+function roomSvg(t){
+  const L={
+    k1:[[20,25,120,90,'洋室 6畳'],[140,25,80,45,'キッチン'],[140,70,80,45,'バス・トイレ']],
+    ldk1:[[15,20,100,100,'LDK 10畳'],[115,20,70,100,'洋室 6畳'],[185,20,45,50,'バス・トイレ'],[185,70,45,50,'収納']],
+    ldk2:[[10,15,100,100,'LDK 12畳'],[110,15,60,55,'洋室 6畳'],[110,70,60,45,'洋室 5畳'],[170,15,60,55,'水回り'],[170,70,60,45,'収納']],
+    ldk3:[[10,8,110,82,'LDK 14畳'],[120,8,55,45,'洋室 6畳'],[175,8,55,45,'洋室 6畳'],[120,53,55,37,'洋室 5畳'],[175,53,55,37,'水回り'],[10,90,220,38,'廊下・収納・ベランダ']]};
+  const ar={k1:'約25㎡',ldk1:'約40㎡',ldk2:'約55㎡',ldk3:'約70㎡'}[t];
+  return '<svg class="fp" viewBox="0 0 240 150" role="img" aria-label="'+ROOMS[t]+'の間取りイメージ">'
+    +L[t].map(r=>'<rect x="'+r[0]+'" y="'+r[1]+'" width="'+r[2]+'" height="'+r[3]+'"/><text x="'+(r[0]+r[2]/2)+'" y="'+(r[1]+r[3]/2+3)+'">'+r[4]+'</text>').join('')
+    +'<text x="120" y="146" style="font-size:11px;font-weight:700">'+ar+'</text></svg>';
+}
+function renderHome(){
+  const A=AREAS[S.area];
+  $('#exitField').hidden=(S.home!=='parent');
+  $('#rentTitleNote').textContent=S.home==='parent'?'実家を出たあとの部屋':S.home==='buy'?'買うまでの間の部屋':'';
+  $('#buyBox').hidden=(S.home!=='buy');
+  const cm=A.min, hrs=Math.round(cm*2*240/60);
+  const ai=$('#areaInfo'); ai.className='callout '+(cm<=30?'good':cm<=45?'warn':'bad');
+  ai.innerHTML='<b>'+esc(A.name)+'</b>から新宿まで、電車で約<b>'+cm+'分</b>(代表的な駅からの目安)。往復で1日'+(cm*2)+'分、出勤240日で年間約'+hrs+'時間です。'
+    +(cm>45?'通勤が長くなり、朝のラッシュは混雑します。':'')+(A.est?'<br>この地域の家賃は推定を含みます。':'');
+  const pn=PREFS[A.pref];
+  $('#listIntro').textContent='部屋の写真や、いま出ている実際の物件は、不動産会社のサイトで確認できます。1K〜2LDKの物件を見比べて、家賃の感覚をつかみましょう。';
+  $('#listLinks').innerHTML='<a class="btn ghost" href="https://suumo.jp/chintai/'+A.pref+'/" target="_blank" rel="noopener">SUUMOで'+pn+'の物件を見る</a>'
+    +'<a class="btn ghost" href="https://www.homes.co.jp/chintai/'+A.pref+'/" target="_blank" rel="noopener">LIFULL HOME\'Sで'+pn+'の物件を見る</a>'
+    +(A.pref==='tokyo'?'<a class="btn ghost" href="https://www.chintai.net/rent/tokyo/area/1k/" target="_blank" rel="noopener">CHINTAIの区市別の相場を見る</a>':'');
+  $('#roomCards').innerHTML=ROOM_ORDER.map(k=>{
+    const inner=roomSvg(k)+'<span class="t">'+esc(ROOMS[k].split('(')[0])+'</span><span class="d">家賃 月'+f1(A.rent[k])+'万円</span>';
+    return k==='ldk3'?'<div class="rc">'+inner+'</div>':'<button type="button" class="rc" data-room="'+k+'" aria-pressed="'+(k===S.room)+'">'+inner+'</button>';
+  }).join('');
+  const net=th(grossSelf(S,25))/12, rent=A.rent[S.room], pct=rent/net*100;
+  const rb=$('#rentInfo'); rb.className='callout '+(pct>40?'bad':pct>33?'warn':'good');
+  rb.innerHTML='<b>'+esc(A.name)+'の'+esc(ROOMS[S.room])+'</b>は、家賃が月'+f1(rent)+'万円。25歳の手取り月収'+f1(net)+'万円の<b>'+Math.round(pct)+'%</b>です(家賃は手取りの3分の1以下が目安)。'
+    +'<br>結婚や子どもで「3LDK」に引っ越すと、月'+f1(A.rent.ldk3)+'万円になります。'+(S.home==='parent'?'<br>実家にいる間は月3万円です。':'');
+  if(S.home==='buy'){
+    $('#priceQuick').innerHTML=[['used','中古・手頃'],['new','新築・平均']].map(k=>'<button type="button" class="chip" data-kind="'+k[0]+'" style="font:inherit;font-size:12px;cursor:pointer;background:'+(S.priceKind===k[0]?'var(--accent-wash)':'none')+';border-color:'+(S.priceKind===k[0]?'var(--accent)':'var(--axis)')+';color:'+(S.priceKind===k[0]?'var(--accent)':'var(--ink2)')+'">'+k[1]+' '+fmt(A.price[k[0]])+'万円</button>').join('');
+    const B=sim.B, r=rowAt(sim,sim.buyAge), hh=r?(r.gross+r.grossSp):grossSelf(S,sim.buyAge);
+    const mult=B.loanAmt/hh, burden=B.payM*12/hh*100;
+    const bb=$('#buyInfo'); bb.className='callout '+((mult>7||burden>30)?'bad':(mult>5||burden>25)?'warn':'good');
+    bb.innerHTML='借入額 <b>'+fmt(B.loanAmt)+'万円</b>は、その年の世帯の年収'+fmt(hh)+'万円の<b>'+f1(mult)+'倍</b>です(5〜7倍までが一般的な目安)。'
+      +'<br>毎月のローン返済は<b>'+f1(B.payM)+'万円</b>。ほかに固定資産税や管理費・修繕費で月'+f1(B.maint)+'万円かかります。年収に対する年間返済の割合は<b>'+Math.round(burden)+'%</b>(25%以内が安心の目安)。'
+      +'<br>最初に必要な現金は約'+fmt(B.down+B.fees)+'万円(頭金+諸費用7%)。完済は'+(sim.buyAge+35)+'歳で、60歳以降は収入が約2割下がっても返済は続きます。'
+      +'<br><span class="note">この価格は、'+esc(A.name)+'の1Kの家賃から換算した目安です。</span>';
+  }
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-room]'); if(!b) return; S.room=b.dataset.room; update(); });
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-kind]'); if(!b) return; S.priceKind=b.dataset.kind; S.price=AREAS[S.area].price[S.priceKind]; update(); });
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-age]'); if(!b) return; S.slipAge=parseInt(b.dataset.age,10); renderSlip(); });
+
+function renderCar(){
+  const car=CARS[S.car]; $('#carDetail').hidden=!car;
+  const box=$('#carInfo');
+  if(!car){ box.className='callout good'; box.textContent='車を持たない場合、車の費用は0円です。新宿へは電車で通えるので、都内では車なしで暮らす人も多くいます。郊外では、買い物などで車が必要になる地域もあります。'; return; }
+  const first=sim.carFirst, r=rowAt(sim,first), r2=rowAt(sim,Math.min(first+5,END_AGE));
+  const m1=r.car/12, m2=r2.car/12, pct=m1/(r.net/12)*100;
+  box.className='callout '+(pct>25?'bad':pct>15?'warn':'');
+  box.innerHTML='<b>'+esc(car.name)+'('+(S.carNew==='new'?'新車':'中古')+')</b>は、買った年から5年間は月<b>'+f1(m1)+'万円</b>(ローン返済+税金・保険・車検・ガソリン・駐車場)で、その年の手取り月収の<b>'+Math.round(pct)+'%</b>です。'
+    +'<br>ローンが終わっても月'+f1(m2)+'万円かかり続け、10年ごとの買い替えも必要です。26歳未満は自動車保険が高くなる設定です。';
+}
+
+function renderLife(){
+  $('#spouseField').hidden=(S.marry===0); $('#kidAgeField').hidden=(S.kids===0);
+  $('#kidNote').textContent=S.kids>0?'子ども1人あたり、生まれてから22歳までに約2,300万円(教育費を含む目安)。'+S.kids+'人で約'+fmt(S.kids*2300)+'万円です。'+(S.marry>0?'配偶者の生活費として毎月6万円、結婚費用として200万円も入れています。':'')
+    :(S.marry>0?'配偶者の生活費として毎月6万円、結婚費用として200万円を入れています。':'');
+  $('#loanBox').hidden=!(S.path==='vo'||S.path==='univLow'||S.path==='univHi');
+  $('#loanHint').textContent=S.loan>0?'毎月の返済は約'+f1(S.loan/240)+'万円を20年間(利子は入れていません)。':'借りなかった場合の返済は0円です。';
+  const A=AREAS[S.area], lc=lifeCosts(S,A,1,false), tot=lc.food+lc.fun+lc.live, net=th(grossSelf(S,25))/12, pct=tot/net*100;
+  const cookDays=30*S.cook/7, taxi=taxiCost(A.min);
+  const LP=liveParts(S), li=$('#lifeInfo'); li.className='callout '+(pct>65?'bad':pct>50?'warn':'');
+  li.innerHTML='<b>1人分の1か月</b>(家賃・車を除く): 毎日の食事 <b>'+f1(lc.food)+'万円</b>(1日あたり約'+fmt(lc.food*10000/30)+'円)、外出・交際 <b>'+f1(lc.fun)+'万円</b>(うち飲み会・二次会 '+f1(lc.nomi)+'万円)、そのほか '+f1(lc.live)+'万円(スマホ'+f1(LP.phone/10000)+'・サブスク'+f1(LP.subs/10000)+'・服'+f1(LP.cloth/10000)+'・美容'+f1(LP.beauty/10000)+'・趣味'+f1(LP.hobby/10000)+'・光熱費日用品'+f1(LP.util/10000)+')。合計 <b>'+f1(tot)+'万円</b>で、25歳の手取り月収'+f1(net)+'万円の<b>'+Math.round(pct)+'%</b>です。'
+    +'<br>夕ごはんは月に約'+Math.round(cookDays)+'日が自炊です。'
+    +(S.nomi>0&&S.nijikai!=='no'?'<br>二次会は1回'+fmt(NIJIKAI_COST)+'円。二次会に行った回数の半分で終電を逃し、'+esc(A.name)+'まで帰るタクシー代などで約'+fmt(taxi)+'円かかる設定です。':'')
+    +(S.marry>0||S.kids>0?'<br>結婚すると、レストランや休日の外出は家族の人数分かかる設定です。':'');
+}
+
+function planLine(){
+  const A=AREAS[S.area], car=CARS[S.car];
+  return PATHS[S.path].name+(S.path==='part'?'':'・'+RANKS[S.rank].name)+' / '+A.name+'(新宿まで約'+A.min+'分)で'+(S.home==='buy'?'持ち家('+fmt(S.price)+'万円)':HOMETXT[S.home])
+    +' / 車: '+(car?car.name+(S.carNew==='new'?'(新車)':'(中古)'):'なし')+' / '+(S.marry?S.marry+'歳で結婚':'結婚なし')+(S.kids?'・子ども'+S.kids+'人':'');
+}
+function planShort(){
+  const strip=s=>s.replace(/\(.*?\)/g,'');
+  return strip(PATHS[S.path].name)+'/'+(S.path==='part'?'':strip(RANKS[S.rank].name)+'/')+AREAS[S.area].name+'/'+HOMETXT[S.home]+'/車'+(S.car==='none'?'なし':CARS[S.car].name)+(S.marry?'/結婚':'')+(S.kids?'/子'+S.kids:'');
+}
+
+function levers(){
+  const out=[], base=sim;
+  const t=(label,patch)=>{ const s2=simulate(Object.assign({},S,patch)); out.push({label,d:s2.final-base.final,lv:s2.level}); };
+  if(S.car!=='none') t('車を持たない',{car:'none'});
+  if(S.car==='compact'||S.car==='van') t('車を軽自動車にする',{car:'kei'});
+  if(S.car!=='none'&&S.carNew==='new') t('車を中古にする',{carNew:'used'});
+  const cur=AREAS[S.area], cheaper=Object.keys(AREAS).map(k=>AREAS[k]).filter(a=>a.min<=45&&a.rent.k1<cur.rent.k1*0.9).sort((a,b)=>b.rent.k1-a.rent.k1);
+  const pick=[]; if(cheaper.length) pick.push(cheaper[0]); if(cheaper.length>2) pick.push(cheaper[cheaper.length-1]);
+  pick.forEach(a=>t('住む場所を「'+a.name+'」にする(新宿まで約'+a.min+'分)',{area:a.key,price:S.priceKind?a.price[S.priceKind]:S.price}));
+  if(S.home==='buy'){ t('家を買わず、賃貸のままにする',{home:'rent'}); if(S.priceKind!=='used') t('家を中古の手頃な価格にする',{priceKind:'used',price:AREAS[S.area].price.used}); }
+  if(S.home==='rent') t('実家で暮らす(結婚まで)',{home:'parent',parentExit:99});
+  const rk=['small','mid','big'], ri=rk.indexOf(S.rank);
+  if(S.path!=='part'&&ri<2&&PATHS[S.path].fit[rk[ri+1]]>=1) t('就職先を「'+RANKS[rk[ri+1]].name+'」にする(届く人は限られます)',{rank:rk[ri+1]});
+  if(S.marry>0&&S.spouse!=='full') t('配偶者が正社員で働く',{spouse:'full'});
+  if(S.kids>0) t('子どもの人数を1人減らす',{kids:S.kids-1});
+  if(S.life!=='low'){ const lo=S.life==='high'?'normal':'low'; t('暮らし全体を「'+LIFE[lo].name+'」にする',Object.assign({life:lo},PRESETS[lo])); }
+  if(S.nomi>0&&S.nijikai!=='no') t('二次会には行かない',{nijikai:'no'});
+  if(S.lunch!=='bento') t('平日の昼ごはんをお弁当にする',{lunch:'bento'});
+  if(S.cook<5) t('夕ごはんを週5日は自炊する',{cook:5});
+  if(S.resto>1) t('レストランを月1回にする',{resto:1});
+  return out.filter(o=>o.d>=30).sort((a,b)=>b.d-a.d).slice(0,5);
+}
+
+function renderResult(){
+  renderWant();
+  const f=sim.final, A=AREAS[S.area];
+  $('#planLine').textContent=planLine();
+  const v=$('#verdict'); v.className='verdict '+sim.level;
+  if(sim.level==='ok') v.innerHTML='<h3>このプランは成り立ちます</h3><p>貯蓄は一度もマイナスにならず、65歳で約'+fmt(f)+'万円残ります。ただし、病気・失業・親の介護、物価の上昇は入っていません。</p>';
+  else if(sim.level==='tight') v.innerHTML='<h3>ギリギリ成り立つプランです</h3><p>貯蓄はマイナスになりませんが、65歳で約'+fmt(f)+'万円です(この授業の目安は1,000万円)。収入が減る出来事があると崩れやすいプランです。</p>';
+  else v.innerHTML='<h3>このままでは成り立ちません</h3><p><b>'+sim.firstNeg+'歳</b>で貯蓄がマイナス(借金の状態)になり、'+sim.minAge+'歳ごろには最大'+fmt(-sim.min)+'万円のマイナスに達します。'
+    +(f>=0?'65歳には約'+fmt(f)+'万円まで戻りますが、それまでは借金や親の援助で乗り切る前提になります。':'65歳には約'+num(f)+'万円(マイナス)になります。')
+    +'どこを動かせば成り立つか、下のヒントや前の画面で探してみましょう。</p>';
+
+  const r35=rowAt(sim,35), m35=(r35.net-(r35.exp-r35.one))/12, h35=r35.hous/12/(r35.net/12)*100;
+  $('#tiles').innerHTML=
+    '<div class="tile"><div class="k">65歳時点の貯蓄</div><div class="v '+(f<0?'neg':'')+'">'+num(f)+'<small style="font-size:14px">万円</small></div><div class="s">退職金・年金は含みません</div></div>'
+   +(sim.firstNeg!==null
+      ?'<div class="tile"><div class="k">貯蓄がマイナスになる年齢</div><div class="v neg">'+sim.firstNeg+'<small style="font-size:14px">歳</small></div><div class="s">いちばん少ないのは'+sim.minAge+'歳の'+num(sim.min)+'万円</div></div>'
+      :'<div class="tile"><div class="k">貯蓄がマイナスになる年齢</div><div class="v pos">なし</div><div class="s">一度もマイナスになりません</div></div>')
+   +'<div class="tile"><div class="k">35歳の毎月の黒字・赤字</div><div class="v '+(m35<0?'neg':'pos')+'">'+num1(m35)+'<small style="font-size:14px">万円</small></div><div class="s">手取りから生活費などを引いた額</div></div>'
+   +'<div class="tile"><div class="k">35歳の住居費の割合</div><div class="v '+(h35>40?'neg':'')+'">'+Math.round(h35)+'<small style="font-size:14px">%</small></div><div class="s">手取りに対する割合(目安は3分の1まで)</div></div>';
+
+  const real25=th(grossSelf(S,25))/12, real35=grossSelf(S,35);
+  const d1=real25-S.net25, d2=real35-S.gross35;
+  const dc=d=>'<td class="'+(d<0?'neg':'pos')+'">'+(d<0?'−':'+')+fmt(Math.abs(d))+'</td>';
+  $('#cmpTbl').innerHTML='<thead><tr><th>項目</th><th>さっきの予想</th><th>計算結果</th><th>差</th></tr></thead><tbody>'
+    +'<tr><td>25歳の毎月の手取り(万円)</td><td>'+S.net25+'</td><td><b>'+f1(real25)+'</b></td>'+dc(Math.round(d1*10)/10)+'</tr>'
+    +'<tr><td>35歳の年収・額面(万円)</td><td>'+fmt(S.gross35)+'</td><td><b>'+fmt(real35)+'</b></td>'+dc(d2)+'</tr></tbody>';
+  $('#cmpNote').textContent='35歳の年収は、予想より'+fmt(Math.abs(d2))+'万円'+(d2<0?'低い':'高い')+'計算になりました。年収'+fmt(real35)+'万円のうち、手元に入る手取りは約'+fmt(th(real35))+'万円(月'+f1(th(real35)/12)+'万円)です。収入の次に、住居や車、家族の支出がいくらかかるかを見てみましょう。';
+
+  renderSlip(); renderCharts();
+  const ev=sim.rows.filter(r=>r.ev.length);
+  $('#events').innerHTML=ev.map(r=>'<li><b>'+r.age+'歳</b><span>'+r.ev.map(esc).join('、')+'</span></li>').join('')||'<li>大きなイベントはありません</li>';
+  $('#allTbl').innerHTML='<thead><tr><th>年齢</th><th>手取り</th><th>住居</th><th>車</th><th>食事</th><th>外出・交際</th><th>そのほか</th><th>結婚・子ども</th><th>奨学金</th><th>一時費用</th><th>貯蓄の増減</th><th>貯蓄残高</th></tr></thead><tbody>'
+    +sim.rows.map(r=>'<tr><td>'+r.age+'歳</td><td>'+fmt(r.net)+'</td><td>'+fmt(r.hous)+'</td><td>'+fmt(r.car)+'</td><td>'+fmt(r.food)+'</td><td>'+fmt(r.fun)+'</td><td>'+fmt(r.live)+'</td><td>'+fmt(r.fam)+'</td><td>'+fmt(r.sch)+'</td><td>'+fmt(r.one)+'</td><td class="'+(r.save<0?'neg':'')+'">'+num(r.save)+'</td><td class="'+(r.bal<0?'neg':'')+'">'+num(r.bal)+'</td></tr>').join('')+'</tbody>';
+  const lv=levers();
+  $('#leverBox').hidden=(sim.level==='ok'&&lv.length===0);
+  $('#leverList').innerHTML=lv.length? lv.map(o=>'<li>'+esc(o.label)+': 65歳の貯蓄が <b>'+sgn(o.d)+'万円</b>'+(o.lv==='ok'&&sim.level!=='ok'?'(これだけで成り立つ)':'')+'</li>').join('')
+    :'<li>1つの条件を動かしただけで大きく変わるものは、見つかりませんでした。いくつかを組み合わせてみましょう。</li>';
+  renderSaved();
+}
+
+function renderSlip(){
+  const rows=sim.rows, ages=[25,30,35,40,45,50,55,60].filter(a=>rowAt(sim,a));
+  if(ages.indexOf(S.slipAge)<0) S.slipAge=ages.indexOf(35)>=0?35:ages[0];
+  $('#ageBtns').innerHTML=ages.map(a=>'<button type="button" data-age="'+a+'" aria-pressed="'+(a===S.slipAge)+'">'+a+'歳</button>').join('');
+  renderSeg();
+}
+function renderSeg(){
+  const r=rowAt(sim,S.slipAge); if(!r) return;
+  const m=x=>x/12;
+  const gross=m(r.gross+r.grossSp), net=m(r.net), tax=m(r.tax), exp=m(r.exp-r.one), remain=net-exp;
+  const parts=[['税金・社会保険料',tax,'var(--tax)','tx'],['住居',m(r.hous),'var(--s1)',''],['車',m(r.car),'var(--s2)',''],['毎日の食事',m(r.food),'var(--s3)',''],['外出・交際',m(r.fun),'var(--s4)','dk'],['そのほかの生活費',m(r.live),'var(--s5)',''],['結婚・子ども',m(r.fam),'var(--s7)',''],['奨学金',m(r.sch),'var(--s8)','']];
+  const total=Math.max(gross,tax+exp), segEl=$('#seg'), W=segEl.clientWidth||320;
+  let html='';
+  parts.forEach(p=>{ if(p[1]<0.005) return; const w=p[1]/total*100;
+    html+='<i class="'+p[3]+'" style="width:'+w+'%;background:'+p[2]+'" title="'+p[0]+' '+f1(p[1])+'万円">'+(w/100*W>=46?f1(p[1]):'')+'</i>'; });
+  const legend=parts.filter(p=>p[1]>=0.005).map(p=>'<span><i style="background:'+p[2]+'"></i>'+p[0]+'</span>');
+  if(remain>=0.005){ const w=remain/total*100; html+='<i style="width:'+w+'%;background:var(--good-fill)" title="のこり">'+(w/100*W>=46?'+'+f1(remain):'')+'</i>'; legend.push('<span><i style="background:var(--good-fill)"></i>のこり(貯金にまわせる)</span>'); }
+  else if(remain<-0.005){ const w=-remain/total*100; html+='<i class="over" style="width:'+w+'%" title="赤字">'+(w/100*W>=56?'赤字 '+f1(-remain):'')+'</i><b class="limit" style="left:'+(gross/total*100)+'%"></b>'; legend.push('<span><i style="background:var(--bad-fill)"></i>赤字(足りない分)</span>'); }
+  segEl.innerHTML=html; segEl.setAttribute('aria-label',S.slipAge+'歳の1か月のお金の使い道。のこりは '+num1(remain)+'万円');
+  $('#segLegend').innerHTML=legend.join('');
+  $('#segLab').textContent=S.slipAge+'歳の1か月(ボーナスを12か月に分けた平均)。'+(remain<-0.005?'点線の右側が、収入では足りない赤字です。':'')+(r.one>0?' このほか、この年だけの出費が'+fmt(r.one)+'万円('+(r.ev.join('、')||'引っ越しなどの初期費用')+')あります。':'');
+  const lab=r.grossSp>0?'世帯':'本人';
+  const row=(n,v,cls,pct)=>'<tr><td>'+n+'</td><td class="'+(cls||'')+'">'+v+'</td><td>'+(pct===undefined?'':pct)+'</td></tr>';
+  const pc=x=>net>0?Math.round(x/net*100)+'%':'';
+  let t='<thead><tr><th>'+S.slipAge+'歳・'+lab+'の1か月</th><th>万円</th><th>手取りに対する割合</th></tr></thead><tbody>';
+  t+=row('額面の月収(ボーナス込み)',f1(gross),'')+row('税金・社会保険料','−'+f1(tax),'')+row('<b>手取り</b>','<b>'+f1(net)+'</b>','','100%');
+  t+=row('住居費','−'+f1(m(r.hous)),'',pc(m(r.hous)))+row('車','−'+f1(m(r.car)),'',pc(m(r.car)))+row('毎日の食事','−'+f1(m(r.food)),'',pc(m(r.food)))+row('外出・交際(休日・外食・飲み会)','−'+f1(m(r.fun)),'',pc(m(r.fun)))+row('そのほかの生活費','−'+f1(m(r.live)),'',pc(m(r.live)));
+  if(r.fam>0) t+=row('結婚・子ども','−'+f1(m(r.fam)),'',pc(m(r.fam)));
+  if(r.sch>0) t+=row('奨学金の返済','−'+f1(m(r.sch)),'',pc(m(r.sch)));
+  t+=row('<b>毎月ののこり</b>','<b>'+num1(remain)+'</b>',remain<0?'neg':'pos',pc(remain))+'</tbody>';
+  $('#slipTbl').innerHTML=t;
+}
+
+function savePlan(){
+  if(plans.length>=4) plans.shift();
+  plans.push({label:planShort(),final:sim.final,min:sim.min,minAge:sim.minAge,neg:sim.firstNeg,level:sim.level});
+  store('plans',JSON.stringify(plans)); renderSaved();
+}
+function renderSaved(){
+  const lvTxt={ok:'成り立つ',tight:'ギリギリ',ng:'成り立たない'};
+  $('#savedTbl').innerHTML='<thead><tr><th>プラン</th><th>65歳の貯蓄(万円)</th><th>最も少ない時期</th><th>貯蓄がマイナスになる年齢</th><th>判定</th></tr></thead><tbody>'
+    +(plans.length?plans.map(p=>'<tr><td>'+esc(p.label)+'</td><td class="'+(p.final<0?'neg':'')+'">'+num(p.final)+'</td><td>'+p.minAge+'歳 '+num(p.min)+'</td><td>'+(p.neg===null?'なし':p.neg+'歳')+'</td><td>'+lvTxt[p.level]+'</td></tr>').join('')
+      :'<tr><td colspan="5">まだ保存したプランはありません。</td></tr>')+'</tbody>';
+}
+function copySummary(){
+  const real25=th(grossSelf(S,25))/12, real35=grossSelf(S,35);
+  const text=['【未来の家計簿 結果】',planLine(),
+    '65歳時点の貯蓄: '+num(sim.final)+'万円(判定: '+{ok:'成り立つ',tight:'ギリギリ',ng:'成り立たない'}[sim.level]+')',
+    sim.firstNeg!==null?'貯蓄がマイナスになる年齢: '+sim.firstNeg+'歳':'貯蓄は一度もマイナスにならない',
+    '貯蓄が最も少ない年齢: '+sim.minAge+'歳('+num(sim.min)+'万円)',
+    '暮らし: 昼は'+OPT.lunch[S.lunch][0]+'、夕食の自炊は週'+S.cook+'日、休日の外出は月'+S.outing+'回、レストランは月'+S.resto+'回、飲み会は月'+S.nomi+'回(二次会: '+OPT.nijikai[S.nijikai][0]+')、スマホ: '+OPT.phoneP[S.phoneP][0]+'、サブスク'+S.subs+'件、服: '+OPT.cloth[S.cloth][0]+'、趣味: '+OPT.hobby[S.hobby][0],
+    '予想: 25歳の手取り月'+S.net25+'万円・35歳の年収'+fmt(S.gross35)+'万円 → 計算: 月'+f1(real25)+'万円・'+fmt(real35)+'万円','',
+    '【いまの自分】偏差値'+S.dev+'・評定'+f1(S.hyotei)+'・平日の勉強'+S.wkStudy+'分・休日'+S.holStudy+'分・スマホ等'+f1(S.phone)+'時間/日',
+    '【憧れの会社】'+DREAMS[S.dream].name+'(入社者に多い大学帯 偏差値約'+DREAMS[S.dream].req+'〈推定〉)',
+    '勉強量: 必要 約'+fmt(dreamGap().need)+'時間(推定)・必要なペースは今の'+(isFinite(dreamGap().ratio)?f1(dreamGap().ratio)+'倍':'—')+'・このまま続けた偏差値 約'+f1(dreamGap().projNow),
+    '目標の大学レベル: '+(function(){var g=dreamGap();return univOf(g.reqDev)[1]+'(偏差値'+g.reqDev+'〜)';})(),'',
+    '【ふりかえり】','1. '+$('#r1').value,'2. '+$('#r2').value,'3. '+$('#r3').value,'4. '+$('#r4').value,'5. '+$('#r5').value,'6. '+$('#r6').value].join('\n');
+  const msg=$('#copyMsg');
+  const fallback=()=>{ let ta=$('#copyFallback'); if(!ta){ ta=document.createElement('textarea'); ta.id='copyFallback'; ta.readOnly=true; ta.style.marginTop='10px'; $('#copySummary').closest('.card').appendChild(ta); }
+    ta.value=text; ta.select(); msg.textContent='下の文章を選んでコピーしてください。'; };
+  try{ navigator.clipboard.writeText(text).then(()=>{ msg.textContent='コピーしました。'; },fallback); }catch(e){ fallback(); }
+}
+
+/* ===== いまの自分/憧れの会社 ===== */
+const TILE=(l,v,s)=>'<div class="tile"><div class="k">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';
+function renderNow(){
+  const daily=studyDaily(S), wk=daily*7, yr=daily*365, days=daysToExam();
+  const phoneH=S.phone, ratio=phoneH>0&&daily>0?phoneH/daily:null;
+  $('#nowTiles').innerHTML=TILE('1週間の勉強',f1(wk)+'時間','平日'+S.wkStudy+'分×5日+休日'+S.holStudy+'分×2日')
+    +TILE('1年間の勉強',fmt(yr)+'時間','1日あたり '+f1(daily)+'時間')
+    +TILE('スマホ・ゲーム・動画',f1(phoneH)+'時間 / 日','1年で約'+fmt(phoneH*365)+'時間');
+  let t='高校生全体の平日の勉強は、古い調査(2008年)で平均 約73分でした。あなたは平日 '+S.wkStudy+'分('+(S.wkStudy>=73?'平均以上':'平均より約'+(73-S.wkStudy)+'分少ない')+')。';
+  if(phoneH*60>S.wkStudy) t+=' 平日の勉強より、スマホ・ゲーム・動画のほうが長い(約'+(daily>0?f1(ratio):'∞')+'倍)。';
+  t+=' 共通テストまで、あと約'+days+'日です。';
+  $('#nowNote').textContent=t;
+  // 偏差値→大学
+  const U=univOf(S.dev), hy=S.hyotei;
+  let h='<p>いまの偏差値 <b>'+S.dev+'</b> は、<b>'+esc(U[1])+'</b>のあたりです。<br><span class="note">例: '+esc(U[2])+'</span></p>';
+  const gap=SCHOOL_MAX-S.dev;
+  h+='<p class="note" style="margin-top:8px">この学校から進める最高ライン(日本大・東洋大の上のほう、偏差値約'+SCHOOL_MAX+')まで、あと偏差値 <b>'+(gap>0?gap:0)+'</b>。'+(gap>0?'':'すでに届いています。')+'</p>';
+  const HB=[[4.2,'指定校推薦で、日東駒専クラス以上の枠も狙える(推定)'],[3.9,'推薦で、日東駒専クラスの一部を狙えるライン(推定)'],[3.6,'推薦で、大東亜帝国クラス〜中堅私大を狙えるライン(推定)'],[3.3,'推薦で選べる大学が、入りやすい私大中心になる(推定)'],[3.0,'推薦は使えても、選べる大学がかなり限られる(推定)'],[2.5,'推薦の条件を満たせない大学が多い(推定)'],[0,'推薦はほぼ使えない。一般入試・総合型の準備が中心(推定)']];
+  const hb=HB.find(x=>hy>=x[0]-0.001);
+  h+='<p class="note" style="margin-top:8px">評定平均 <b>'+f1(hy)+' / 5.0</b>: '+hb[1]+'<span class="meter"><i style="width:'+(hy/5*100)+'%"></i></span>推薦の基準は大学ごとに違うので、先生に確認しましょう。</p>';
+  h+='<p class="note" style="margin-top:8px">定期テスト平均 <b>'+S.testAvg+'点</b>: '+(S.testAvg<50?'学校で習う内容の半分も身についていない状態です。入試では、その内容を前提に問題が出ます。':S.testAvg<70?'基本は半分以上わかっている状態です。入試の標準問題には、さらに上積みが必要です。':'基礎はできています。入試問題への橋渡しの段階です。')+'</p>';
+  h+='<p class="note" style="margin-top:8px">提出物: <b>'+HOMEWORK.find(x=>x[0]===S.homework)[1]+'</b>。'+(S.homework==='always'?'評定を守れています。社会人になっても「期限を守る」ことは、そのまま評価になります。':S.homework==='often'?'提出の遅れは、評定を下げる原因になりやすく、推薦のラインにも響きます。':'提出が少ないと評定が下がり、推薦の条件を満たせなくなりやすいです。会社でも、期限を守らない人は任される仕事が減ります。')+'</p>';
+  const goalV=4500, rest=Math.max(0,goalV-S.vocab);
+  h+='<p class="note" style="margin-top:8px">英単語 <b>'+fmt(S.vocab)+'語</b>。日東駒専クラスの英語は、約'+fmt(goalV)+'語が目安(推定)。'+(rest>0?'あと <b>'+fmt(rest)+'語</b>。共通テストまで約'+days+'日なので、<b>毎日 約'+f1(rest/days)+'語</b>ずつ覚える計算です。':'目安を超えています。')+' 英検では、2級が「高校卒業程度」、準2級が「高校中級程度」、3級が「中学卒業程度」とされます。あなたは「'+EIKEN.find(x=>x[0]===S.eiken)[1]+'」です。</p>';
+  $('#devInfo').innerHTML=h;
+  const mon=S.wage*S.hrs*52/12/10000, A=AREAS[S.area], work=th(grossSelf(S,25))/12;
+  $('#baitInfo').innerHTML='月収 約 <b>'+f1(mon)+'万円</b>(年 約'+fmt(mon*12)+'万円)。選んだ地域('+esc(A.name)+')の1Kの家賃は <b>'+f1(A.rent.k1)+'万円</b>。'+(mon>A.rent.k1?'家賃を払うと、のこりは約'+f1(mon-A.rent.k1)+'万円。ここから食費・スマホ・光熱費を払います。':'バイトだけでは、家賃も払えません。')+'<br>いまの進路で働いたときの25歳の手取りは月 <b>'+f1(work)+'万円</b>。バイトは、その約'+Math.round(mon/work*100)+'%です。'+(S.hrs>=20?'週20時間以上は、勉強の時間とぶつかります。':'');
+}
+function dreamGap(){
+  const D=DREAMS[S.dream], days=daysToExam();
+  const reqDev=S.goalUniv==='auto'?D.req:parseInt(S.goalUniv,10);
+  const need=Math.max(0,hoursAt(reqDev)-hoursAt(S.dev));
+  const dailyNow=studyDaily(S), dailyAfter=dailyNow+S.addMin/60;
+  const totalNow=dailyNow*days, totalAfter=dailyAfter*days;
+  const needDaily=need/days;
+  return {D,reqDev,days,need,dailyNow,dailyAfter,totalNow,totalAfter,needDaily,
+    projNow:devAfter(S.dev,totalNow), projAfter:devAfter(S.dev,totalAfter),
+    ratio:dailyAfter>0?needDaily/dailyAfter:Infinity};
+}
+function hbar(label,val,max,color){
+  const w=Math.max(0,Math.min(100,val/max*100));
+  return '<div class="hbar"><div class="hl">'+label+'</div><div class="ht"><div class="hf" style="width:'+w+'%;background:var('+color+')"></div></div><div class="hv">'+f1(val)+'時間</div></div>';
+}
+function renderDream(){
+  const D=DREAMS[S.dream], G=dreamGap();
+  let h='<div class="callout"><b>'+esc(D.name)+'</b>('+esc(D.cat)+') '+esc(D.note)+'</div>';
+  if(D.facts.length) h+='<p class="note" style="margin-top:8px"><b>公表されている事実</b></p><ul class="note">'+D.facts.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+  if(D.est.length) h+='<p class="note"><b>推定・一般的な傾向</b></p><ul class="note">'+D.est.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+  const UD=univOf(D.req), dd=D.req-S.dev, ds=D.req-SCHOOL_MAX;
+  h+='<div class="callout '+(dd>=10?'bad':dd>0?'warn':'good')+'" style="margin-top:8px"><b>入社する人に多い大学(推定)</b>: '+esc(UD[1])+'<br>'+esc(UD[2])+'<br>偏差値の目安は <b>'+D.req+'〜</b>。あなたは今 <b>'+S.dev+'</b>(差 '+(dd>0?dd:0)+')。'+(ds>0?'この学校から進める最高ライン(日大・東洋の上のほう)よりも、さらに <b>'+ds+'</b> 高い大学です。':'この学校から進める範囲に入っています。')+'<br><span class="note">出身大学は会社が公表していないことが多く、ここは一般的な傾向からの推定です。</span></div>';
+  $('#dreamInfo').innerHTML=h;
+  // ギャップ
+  const mx=Math.max(G.needDaily,G.dailyAfter,G.dailyNow,0.5)*1.05;
+  let box=hbar('いまのペース',G.dailyNow,mx,'--s2')+(S.addMin>0?hbar('増やしたペース',G.dailyAfter,mx,'--s3'):'')+hbar('必要なペース',G.needDaily,mx,'--s1')+'<p class="note" style="margin-top:8px">(1日あたりの勉強時間。共通テスト(2028年1月中旬)までの約'+G.days+'日で、偏差値'+G.reqDev+'('+esc(univOf(G.reqDev)[1])+')に届くには、約'+fmt(G.need)+'時間の積み上げが必要、という推定です。)</p>';
+  if(G.need<=0) box='<div class="callout good">いまの偏差値で、目標の大学の帯に、ほぼ届いています。維持しましょう。</div>';
+  $('#gapBox').innerHTML=box;
+  $('#gapTbl').innerHTML='<tbody><tr><td>必要な勉強の積み上げ(推定)</td><td><b>'+fmt(G.need)+'</b>時間</td></tr>'
+    +'<tr><td>いまのペースで共通テストまでに積める時間</td><td>'+fmt(G.totalNow)+'時間</td></tr>'
+    +'<tr><td>このまま続けたときの偏差値(推定)</td><td><b>'+f1(G.projNow)+'</b></td></tr>'
+    +(S.addMin>0?'<tr><td>毎日 '+S.addMin+'分 増やしたときの偏差値(推定)</td><td><b>'+f1(G.projAfter)+'</b></td></tr>':'')
+    +'<tr><td>必要なペースは、いまの何倍?</td><td><b>'+(isFinite(G.ratio)?f1(G.ratio)+'倍':'—')+'</b></td></tr></tbody>';
+  let act='';
+  if(G.need>0){
+    act='<div class="callout '+(G.ratio>2?'bad':'warn')+'">'+(isFinite(G.ratio)&&G.ratio>=1.5?'「'+esc(D.name)+'」の目標に届くには、今の約'+f1(G.ratio)+'倍の勉強が必要です。':'今のペースでも届く可能性はありますが、続けることが前提です。')+' 今のまま続けると、偏差値は約'+f1(G.projNow)+'までしか伸びない計算です。</div>';
+    const pr=G.projAfter, pid=pr>=50?'univHi':pr>=44?'univLow':'vo';
+    act+='<p class="note" style="margin-top:8px">このペースで届きそうな進路(目安): <b>'+PATHS[pid].name+'</b></p><button class="btn ghost" id="applyPath" type="button" data-path="'+pid+'">この進路を、次の画面の初期値にする</button>';
+  }
+  $('#gapAct').innerHTML=act;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('#applyPath'); if(!b) return;
+  S.path=b.dataset.path; S.rank=PATHS[S.path].def; update();
+});
+
+function renderWant(){
+  const r=sim.rows.find(x=>x.age===35)||sim.rows[sim.rows.length-1], free=r.save/12;
+  const f=sim.final;
+  $('#wantCmp').className='callout '+((free>=S.wantFree&&f>=S.wantSave)?'good':(free>=0&&f>=0?'warn':'bad'));
+  $('#wantCmp').innerHTML='<b>お金の希望との比較</b><br>毎月の自由に使えるお金(35歳): 希望 <b>'+S.wantFree+'万円</b> → 計算 <b>'+f1(free)+'万円</b>('+(free>=S.wantFree?'希望どおり':'希望より月'+f1(S.wantFree-free)+'万円足りない')+')<br>65歳の貯金: 希望 <b>'+fmt(S.wantSave)+'万円</b> → 計算 <b>'+fmt(f)+'万円</b>('+(f>=S.wantSave?'希望どおり':'希望より'+fmt(S.wantSave-f)+'万円足りない')+')';
+}
+/* ===== グラフ(SVGを自前で描く) ===== */
+const CATS=[['hous','住居','var(--s1)'],['car','車','var(--s2)'],['food','毎日の食事','var(--s3)'],['fun','外出・交際','var(--s4)'],['live','そのほかの生活費','var(--s5)'],['fam','結婚・子ども','var(--s7)'],['sch','奨学金','var(--s8)'],['one','一時的な出費','var(--s6)']];
+function niceScale(min,max,n){
+  if(max<=min) max=min+1;
+  const raw=(max-min)/n, mag=Math.pow(10,Math.floor(Math.log10(raw))), nr=raw/mag;
+  const step=(nr<=1?1:nr<=2?2:nr<=5?5:10)*mag;
+  const lo=Math.floor(min/step+1e-9)*step, hi=Math.ceil(max/step-1e-9)*step, ticks=[];
+  for(let v=lo;v<=hi+1e-9;v+=step) ticks.push(Math.round(v*1000)/1000);
+  return {min:lo,max:hi,ticks};
+}
+function roundTop(x,y,w,h,r){ r=Math.min(r,h,w/2); return 'M'+x+','+(y+h)+'V'+(y+r)+'Q'+x+','+y+' '+(x+r)+','+y+'H'+(x+w-r)+'Q'+(x+w)+','+y+' '+(x+w)+','+(y+r)+'V'+(y+h)+'Z'; }
+
+function tipRow(tip,label,val,color,cls){
+  const d=document.createElement('div'); d.className='r';
+  const a=document.createElement('span');
+  if(color){ const k=document.createElement('i'); k.style.borderColor=color; a.appendChild(k); }
+  a.appendChild(document.createTextNode(label));
+  const b=document.createElement('b'); b.textContent=val; if(cls) b.className=cls;
+  d.appendChild(a); d.appendChild(b); tip.appendChild(d);
+}
+function tipHead(tip,r){
+  tip.textContent=''; const h=document.createElement('div'); h.className='h'; h.textContent=r.age+'歳'; tip.appendChild(h);
+}
+function tipEvents(tip,r){
+  if(!r.ev.length) return; const e=document.createElement('div'); e.className='note'; e.textContent=r.ev.join('、'); tip.appendChild(e);
+}
+function tipA(tip,r){
+  tipHead(tip,r); tipRow(tip,'手取り(収入)',fmt(r.net)+'万円','var(--ink)');
+  CATS.forEach(c=>{ if(r[c[0]]>0.5) tipRow(tip,c[1],fmt(r[c[0]])+'万円',c[2]); });
+  tipRow(tip,'貯蓄の増減',num(r.save)+'万円',null,r.save<0?'neg':'pos'); tipEvents(tip,r);
+}
+function tipB(tip,r){
+  tipHead(tip,r); tipRow(tip,'貯蓄残高',num(r.bal)+'万円','var(--s1)',r.bal<0?'neg':''); tipRow(tip,'この年の増減',num(r.save)+'万円',null,r.save<0?'neg':'pos'); tipEvents(tip,r);
+}
+function hover(host,svg,g,fill){
+  let tip=host.querySelector('.tip');
+  if(!tip){ tip=document.createElement('div'); tip.className='tip'; tip.hidden=true; host.appendChild(tip); }
+  const cross=svg.querySelector('.cross'); let cur2=null;
+  const show=k=>{
+    cur2=Math.max(0,Math.min(g.n-1,k)); const x=g.ml+g.band*(cur2+0.5);
+    cross.setAttribute('x1',x); cross.setAttribute('x2',x); cross.style.display='';
+    fill(tip,sim.rows[cur2]); tip.hidden=false;
+    const tw=tip.offsetWidth; let left=x+14; if(left+tw>g.W) left=x-tw-14; if(left<0) left=0;
+    tip.style.left=left+'px'; tip.style.top='8px';
+  };
+  const hide=()=>{ tip.hidden=true; cross.style.display='none'; };
+  const at=e=>{ const r=svg.getBoundingClientRect(); show(Math.floor(((e.clientX-r.left)*(g.W/r.width)-g.ml)/g.band)); };
+  svg.addEventListener('pointermove',at); svg.addEventListener('pointerdown',at); svg.addEventListener('pointerleave',hide);
+  svg.addEventListener('focus',()=>show(cur2===null?Math.floor(g.n/2):cur2)); svg.addEventListener('blur',hide);
+  svg.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'){ show((cur2===null?-1:cur2)+1); e.preventDefault(); }
+    else if(e.key==='ArrowLeft'){ show((cur2===null?1:cur2)-1); e.preventDefault(); }
+    else if(e.key==='Escape') hide();
+  });
+}
+function xLabels(rows,ml,band,W,H){
+  const step=W<480?10:5; let s='';
+  rows.forEach((r,i)=>{ if(r.age%step===0||i===0) s+='<text x="'+(ml+band*(i+0.5))+'" y="'+(H-8)+'" text-anchor="middle" font-size="11">'+r.age+'歳</text>'; });
+  return s;
+}
+
+function renderCharts(){
+  const used=CATS.filter(c=>sim.rows.some(r=>r[c[0]]>0.5));
+  $('#lgA').innerHTML=used.map(c=>'<span><i style="background:'+c[2]+'"></i>'+c[1]+'</span>').join('')+'<span><i class="ln"></i>手取り(収入)</span>';
+  drawA(); drawB();
+}
+function drawA(){
+  const host=$('#chartA'), W=Math.max(300,host.clientWidth||600), H=W<480?250:300;
+  const ml=W<480?42:50, mr=10, mt=20, mb=28, rows=sim.rows, n=rows.length, iw=W-ml-mr, ih=H-mt-mb, band=iw/n;
+  const maxV=Math.max.apply(null,rows.map(r=>Math.max(r.exp,r.net)));
+  const sc=niceScale(0,maxV*1.04,4), y=v=>mt+ih-(v-sc.min)/(sc.max-sc.min)*ih, bw=Math.max(3,Math.min(24,band-2));
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img" tabindex="0" aria-label="年齢ごとの手取りと支出の棒グラフ。矢印キーで年齢を選べます">';
+  s+='<text x="2" y="10" font-size="11">万円 / 年</text>';
+  sc.ticks.forEach(t=>{ s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y(t)+'" y2="'+y(t)+'" style="stroke:var(--grid)" stroke-width="1"/><text x="'+(ml-6)+'" y="'+(y(t)+4)+'" text-anchor="end" font-size="11">'+fmt(t)+'</text>'; });
+  s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y(0)+'" y2="'+y(0)+'" style="stroke:var(--axis)" stroke-width="1.5"/>';
+  rows.forEach((r,i)=>{
+    const x=ml+band*i+(band-bw)/2; let cum=0;
+    const act=CATS.filter(c=>r[c[0]]>0.5), lastKey=act.length?act[act.length-1][0]:null;
+    act.forEach((c,k)=>{
+      const v=r[c[0]], y0=y(cum), y1=y(cum+v); cum+=v;
+      const yb=y0-(k===0?0:1), yt=y1+(c[0]===lastKey?0:1), h=yb-yt; if(h<=0.4) return;
+      s+= c[0]===lastKey&&h>=3 ? '<path d="'+roundTop(x,yt,bw,h,bw>=8?4:2)+'" style="fill:'+c[2]+'"/>' : '<rect x="'+x+'" y="'+yt+'" width="'+bw+'" height="'+h+'" style="fill:'+c[2]+'"/>';
+    });
+  });
+  s+='<polyline fill="none" style="stroke:var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="'+rows.map((r,i)=>(ml+band*(i+0.5)).toFixed(1)+','+y(r.net).toFixed(1)).join(' ')+'"/>';
+  const li=n-1; s+='<circle cx="'+(ml+band*(li+0.5))+'" cy="'+y(rows[li].net)+'" r="4" style="fill:var(--ink);stroke:var(--surface)" stroke-width="2"/>';
+  s+=xLabels(rows,ml,band,W,H);
+  s+='<line class="cross" y1="'+mt+'" y2="'+(mt+ih)+'" style="stroke:var(--ink2);display:none" stroke-width="1"/></svg>';
+  host.innerHTML=s; hover(host,host.querySelector('svg'),{ml,band,n,W},tipA);
+}
+function drawB(){
+  const host=$('#chartB'), W=Math.max(300,host.clientWidth||600), H=W<480?230:260;
+  const ml=W<480?46:56, mr=12, mt=22, mb=28, rows=sim.rows, n=rows.length, iw=W-ml-mr, ih=H-mt-mb, band=iw/n;
+  const bals=rows.map(r=>r.bal), lo=Math.min(0,Math.min.apply(null,bals)), hi=Math.max(0,Math.max.apply(null,bals));
+  const sc=niceScale(lo,hi+(hi-lo)*0.06,4), y=v=>mt+ih-(v-sc.min)/(sc.max-sc.min)*ih, y0=y(0);
+  const px=i=>ml+band*(i+0.5);
+  const pts=rows.map((r,i)=>px(i).toFixed(1)+','+y(r.bal).toFixed(1));
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img" tabindex="0" aria-label="年齢ごとの貯蓄残高の折れ線グラフ。矢印キーで年齢を選べます">';
+  s+='<defs><clipPath id="cpPos"><rect x="0" y="0" width="'+W+'" height="'+y0+'"/></clipPath><clipPath id="cpNeg"><rect x="0" y="'+y0+'" width="'+W+'" height="'+(H-y0)+'"/></clipPath></defs>';
+  s+='<text x="2" y="10" font-size="11">万円</text>';
+  sc.ticks.forEach(t=>{ if(Math.abs(t)<1e-9) return; s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y(t)+'" y2="'+y(t)+'" style="stroke:var(--grid)" stroke-width="1"/><text x="'+(ml-6)+'" y="'+(y(t)+4)+'" text-anchor="end" font-size="11">'+num(t)+'</text>'; });
+  s+='<text x="'+(ml-6)+'" y="'+(y0+4)+'" text-anchor="end" font-size="11">0</text>';
+  const area='M'+px(0)+','+y0+'L'+pts.join('L')+'L'+px(n-1)+','+y0+'Z';
+  s+='<path d="'+area+'" clip-path="url(#cpPos)" style="fill:var(--s1)" fill-opacity=".12"/><path d="'+area+'" clip-path="url(#cpNeg)" style="fill:var(--bad-fill)" fill-opacity=".18"/>';
+  s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y0+'" y2="'+y0+'" style="stroke:var(--ink2)" stroke-width="1.2"/>';
+  const pl=pts.join(' ');
+  s+='<polyline clip-path="url(#cpPos)" fill="none" style="stroke:var(--s1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="'+pl+'"/>';
+  s+='<polyline clip-path="url(#cpNeg)" fill="none" style="stroke:var(--bad-fill)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="'+pl+'"/>';
+  const last=rows[n-1], dot=(i,r)=>'<circle cx="'+px(i)+'" cy="'+y(r.bal)+'" r="4" style="fill:'+(r.bal<0?'var(--bad-fill)':'var(--s1)')+';stroke:var(--surface)" stroke-width="2"/>';
+  s+=dot(n-1,last);
+  const ey=Math.max(mt+10,Math.min(H-mb-6,y(last.bal)+(last.bal<0?18:-10)));
+  s+='<text x="'+(W-mr)+'" y="'+ey+'" text-anchor="end" font-size="12" font-weight="700" style="fill:var(--ink)">65歳 '+num(last.bal)+'万円</text>';
+  const mi=rows.findIndex(r=>r.age===sim.minAge);
+  if(mi>=0&&mi<n-1&&(sim.min<0||mi>0)){
+    s+=dot(mi,rows[mi]);
+    const right=px(mi)>W*0.55, my=Math.max(mt+10,Math.min(H-mb-6,y(sim.min)+(sim.min<0?18:-10)));
+    s+='<text x="'+(px(mi)+(right?-8:8))+'" y="'+my+'" text-anchor="'+(right?'end':'start')+'" font-size="12" style="fill:var(--ink)">最少 '+sim.minAge+'歳 '+num(sim.min)+'万円</text>';
+  }
+  s+=xLabels(rows,ml,band,W,H);
+  s+='<line class="cross" y1="'+mt+'" y2="'+(mt+ih)+'" style="stroke:var(--ink2);display:none" stroke-width="1"/></svg>';
+  host.innerHTML=s; hover(host,host.querySelector('svg'),{ml,band,n,W},tipB);
+}
+
+init();
+})();
+</script>
+</body>
+</html>
